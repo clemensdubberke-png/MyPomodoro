@@ -551,6 +551,7 @@ let breakAtStart = 0;    // bank value when current break session started (for a
 let overtime     = false; // work mode running past the 25-min mark
 let startEpoch   = null;  // Date.now() when timer last started/resumed
 let startLeft    = null;  // timeLeft value when timer last started/resumed
+let viewMode     = 'work'; // which tab the UI is currently showing (can differ from mode)
 
 /* ═══════════════════════════════════════════════════════════════
    DOM
@@ -760,6 +761,14 @@ function notifyUser(msg) {
   }
 }
 
+/* Updates tab highlight + viewMode without touching the timer */
+function setViewTab(key) {
+  viewMode = key;
+  document.querySelectorAll('.tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.mode === key)
+  );
+}
+
 /* ═══════════════════════════════════════════════════════════════
    SWITCH MODE
 ═══════════════════════════════════════════════════════════════ */
@@ -780,11 +789,9 @@ function switchMode(key) {
     timeLeft     = breakBank;
   }
 
+  setViewTab(key);
   applyTheme(key);
   modeText.textContent = CFG[key].label;
-  document.querySelectorAll('.tab').forEach(t =>
-    t.classList.toggle('active', t.dataset.mode === key)
-  );
   refresh();
 }
 
@@ -883,20 +890,25 @@ function startTimer() {
 }
 
 function toggleTimer() {
-  running ? stopTimer() : startTimer();
+  if (viewMode === 'pause' && mode === 'work') {
+    /* User is on the Pause tab while work mode is active
+       → stop the work timer and actively start the break */
+    switchMode('pause');
+    startTimer();
+  } else {
+    running ? stopTimer() : startTimer();
+  }
 }
 
 function resetTimer() {
   stopTimer();
   overtime = false;
   /* Always return to work mode on reset; break bank is preserved */
-  if (mode !== 'work') {
+  if (mode !== 'work' || viewMode !== 'work') {
     mode = 'work';
+    setViewTab('work');
     applyTheme('work');
     modeText.textContent = CFG.work.label;
-    document.querySelectorAll('.tab').forEach(t =>
-      t.classList.toggle('active', t.dataset.mode === 'work')
-    );
   }
   timeLeft = CFG.work.sec;
   refresh();
@@ -910,7 +922,15 @@ btnMain.addEventListener('click',  toggleTimer);
 btnReset.addEventListener('click', resetTimer);
 document.querySelectorAll('.tab').forEach(tab =>
   tab.addEventListener('click', () => {
-    if (!tab.disabled) switchMode(tab.dataset.mode);
+    if (tab.disabled) return;
+    const target = tab.dataset.mode;
+    if (running && mode === 'work') {
+      /* Work timer is running: only update the view, don't touch the timer.
+         The break starts only when the user explicitly presses play. */
+      setViewTab(target);
+    } else {
+      switchMode(target);
+    }
   })
 );
 
