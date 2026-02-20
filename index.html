@@ -24,7 +24,6 @@
   <!-- Microsoft -->
   <meta name="msapplication-TileColor" content="#0a0a18" />
 
-  <!-- Description -->
   <meta name="description" content="Ein schöner Pomodoro Timer für fokussiertes Arbeiten" />
 
   <link
@@ -40,16 +39,13 @@
       --accent-soft: #ffbe76;
       --glow:        rgba(255, 107, 53, 0.40);
       --bg-deep:     #0a0a18;
-      /* Safe area insets for notched phones */
       --sat: env(safe-area-inset-top,    0px);
       --sab: env(safe-area-inset-bottom, 0px);
       --sal: env(safe-area-inset-left,   0px);
       --sar: env(safe-area-inset-right,  0px);
     }
 
-    html {
-      height: -webkit-fill-available;
-    }
+    html { height: -webkit-fill-available; }
 
     body {
       font-family: 'Outfit', 'Segoe UI', sans-serif;
@@ -66,7 +62,6 @@
       user-select: none;
       -webkit-user-select: none;
       touch-action: manipulation;
-      /* Safe area padding */
       padding-top:    var(--sat);
       padding-bottom: var(--sab);
       padding-left:   var(--sal);
@@ -93,7 +88,7 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: clamp(16px, 3.5vw, 30px);
+      gap: clamp(14px, 3vw, 26px);
       padding: 12px 16px;
       width: 100%;
       max-width: 420px;
@@ -117,28 +112,48 @@
       border-radius: 100px;
       padding: 4px;
       width: 100%;
-      max-width: 340px;
+      max-width: 320px;
     }
     .tab {
       flex: 1;
-      padding: 8px 10px;
+      padding: 8px 14px;
       border: none;
       border-radius: 100px;
       background: transparent;
       color: rgba(255,255,255,0.45);
       font-family: inherit;
-      font-size: clamp(0.68rem, 2.2vw, 0.80rem);
+      font-size: clamp(0.72rem, 2.4vw, 0.84rem);
       font-weight: 400;
       cursor: pointer;
       transition: all 0.3s ease;
       white-space: nowrap;
       -webkit-tap-highlight-color: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
     }
     .tab.active {
       background: var(--accent);
       color: #fff;
       font-weight: 600;
       box-shadow: 0 2px 14px var(--glow);
+    }
+    .tab:disabled {
+      opacity: 0.30;
+      cursor: not-allowed;
+    }
+    /* small monospace time badge inside tab */
+    .tab-bank {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.75em;
+      letter-spacing: 0;
+      background: rgba(255,255,255,0.15);
+      padding: 1px 6px;
+      border-radius: 20px;
+    }
+    .tab.active .tab-bank {
+      background: rgba(0,0,0,0.20);
     }
 
     /* ── Timer area ── */
@@ -249,11 +264,76 @@
     }
     .btn-main.running { animation: pulse-glow 2s ease-in-out infinite; }
 
-    /* ── Session label ── */
+    /* ── Info row (session + bank) ── */
+    .info-row {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+    }
     .session-label {
       font-size: clamp(0.68rem, 2vw, 0.74rem);
       color: rgba(255,255,255,0.32);
       letter-spacing: 0.08em;
+    }
+    /* Break bank display */
+    .bank-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: clamp(0.72rem, 2.2vw, 0.78rem);
+      color: rgba(255,255,255,0.22);
+      letter-spacing: 0.04em;
+      transition: color 0.5s;
+    }
+    .bank-row.has-time {
+      color: var(--accent);
+    }
+    .bank-time {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.9em;
+    }
+    /* subtle animated dot when bank has time */
+    .bank-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: currentColor;
+      opacity: 0;
+      transition: opacity 0.4s;
+    }
+    .bank-row.has-time .bank-dot {
+      opacity: 1;
+      animation: bank-pulse 2.5s ease-in-out infinite;
+    }
+    @keyframes bank-pulse {
+      0%,100% { transform: scale(1);   opacity: 0.7; }
+      50%      { transform: scale(1.6); opacity: 1;   }
+    }
+
+    /* ── Earned toast ── */
+    .earned-toast {
+      position: fixed;
+      bottom: calc(var(--sab) + 80px);
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 100px;
+      padding: 9px 20px;
+      font-size: 0.80rem;
+      color: rgba(255,255,255,0.85);
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 100;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    .earned-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
     }
 
     /* ── Install banner ── */
@@ -270,10 +350,8 @@
       font-size: 0.78rem;
       color: rgba(255,255,255,0.75);
       max-width: 320px;
-      text-align: center;
     }
     #installBanner.visible { display: flex; }
-    #installBanner svg { flex-shrink: 0; color: var(--accent); }
     #btnInstall {
       background: var(--accent);
       border: none;
@@ -300,15 +378,17 @@
 <body>
 
 <div id="stars"></div>
+<div class="earned-toast" id="earnedToast"></div>
 
 <div class="app">
   <div class="title">Pomodoro</div>
 
-  <!-- Mode selector -->
+  <!-- Mode selector: Fokus + Pause (with bank time) -->
   <div class="tabs">
     <button class="tab active" data-mode="work">Fokus</button>
-    <button class="tab" data-mode="short">Kurze Pause</button>
-    <button class="tab" data-mode="long">Lange Pause</button>
+    <button class="tab" data-mode="pause" id="tabPause" disabled>
+      Pause
+    </button>
   </div>
 
   <!-- SVG Timer + overlay -->
@@ -336,7 +416,6 @@
           <stop offset="100%" id="ig1" stop-opacity="0"/>
         </radialGradient>
 
-        <!-- Tip dot glow -->
         <filter id="dotGlow" x="-100%" y="-100%" width="300%" height="300%">
           <feGaussianBlur stdDeviation="3" result="blur"/>
           <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
@@ -350,7 +429,7 @@
         stroke-width="1"
         stroke-dasharray="4 10"/>
 
-      <!-- Tick marks -->
+      <!-- Tick marks (generated by JS) -->
       <g id="ticks" opacity="0.22"></g>
 
       <!-- Track ring -->
@@ -372,7 +451,7 @@
         stroke-linecap="round"
         filter="url(#arcGlow)"/>
 
-      <!-- Moving tip dot on arc -->
+      <!-- Moving tip dot -->
       <circle id="arcTip" cx="155" cy="33" r="6"
         fill="white" opacity="0.9"
         filter="url(#dotGlow)"/>
@@ -380,8 +459,8 @@
 
     <!-- Centered text overlay -->
     <div class="timer-center">
-      <div class="time-text"  id="timeText">25:00</div>
-      <div class="mode-text"  id="modeText">Fokus</div>
+      <div class="time-text" id="timeText">25:00</div>
+      <div class="mode-text" id="modeText">Fokus</div>
       <div class="dots">
         <div class="dot" id="d1"></div>
         <div class="dot" id="d2"></div>
@@ -393,8 +472,7 @@
 
   <!-- Playback controls -->
   <div class="controls">
-    <!-- Reset -->
-    <button class="btn-icon" id="btnReset" title="Zurücksetzen (R)">
+    <button class="btn-icon" id="btnReset" title="Zurücksetzen">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
            stroke="currentColor" stroke-width="2.5"
            stroke-linecap="round" stroke-linejoin="round">
@@ -404,8 +482,7 @@
       </svg>
     </button>
 
-    <!-- Play / Pause -->
-    <button class="btn-main" id="btnMain" title="Start / Pause (Leertaste)">
+    <button class="btn-main" id="btnMain" title="Start / Pause">
       <svg id="icoPlay" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
         <polygon points="6,3 20,12 6,21"/>
       </svg>
@@ -416,8 +493,7 @@
       </svg>
     </button>
 
-    <!-- Skip -->
-    <button class="btn-icon" id="btnSkip" title="Überspringen">
+    <button class="btn-icon" id="btnSkip" title="Sitzung beenden">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
            stroke="currentColor" stroke-width="2.5"
            stroke-linecap="round" stroke-linejoin="round">
@@ -427,7 +503,15 @@
     </button>
   </div>
 
-  <div class="session-label" id="sessionLabel">Sitzung 1 von 4</div>
+  <!-- Session info + break bank -->
+  <div class="info-row">
+    <div class="session-label" id="sessionLabel">Sitzung 1 von 4</div>
+    <div class="bank-row" id="bankRow">
+      <span class="bank-dot"></span>
+      <span>Pausen-Guthaben</span>
+      <span class="bank-time" id="bankTime">0:00</span>
+    </div>
+  </div>
 
   <!-- PWA Install Banner -->
   <div id="installBanner">
@@ -441,11 +525,20 @@
 </div>
 
 <script>
-/* ── Config ───────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   CONFIG
+═══════════════════════════════════════════════════════════════ */
 const CFG = {
-  work:  { sec: 25*60, label: 'Fokus',       c0:'#ffbe76', c1:'#ff6b35', c2:'#e84118', glow:'rgba(255,107,53,0.40)',   ig:'#ff6b35',  tip:'#ffbe76' },
-  short: { sec:  5*60, label: 'Kurze Pause', c0:'#55efc4', c1:'#1dd1a1', c2:'#00b894', glow:'rgba(29,209,161,0.38)',   ig:'#1dd1a1',  tip:'#55efc4' },
-  long:  { sec: 15*60, label: 'Lange Pause', c0:'#a4c8ff', c1:'#54a0ff', c2:'#2e86de', glow:'rgba(84,160,255,0.38)',   ig:'#54a0ff',  tip:'#a4c8ff' },
+  work:  {
+    sec: 25*60, label: 'Fokus',
+    c0:'#ffbe76', c1:'#ff6b35', c2:'#e84118',
+    glow:'rgba(255,107,53,0.40)', ig:'#ff6b35', tip:'#ffbe76',
+  },
+  pause: {
+    label: 'Pause',
+    c0:'#55efc4', c1:'#1dd1a1', c2:'#00b894',
+    glow:'rgba(29,209,161,0.38)', ig:'#1dd1a1', tip:'#55efc4',
+  },
 };
 
 const R    = 122;
@@ -453,14 +546,20 @@ const CX   = 155;
 const CY   = 155;
 const CIRC = 2 * Math.PI * R;
 
-/* ── State ────────────────────────────────────────────────────── */
-let mode        = 'work';
-let timeLeft    = CFG.work.sec;
-let running     = false;
-let timerId     = null;
-let doneInCycle = 0;
+/* ═══════════════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════════════ */
+let mode         = 'work';
+let timeLeft     = CFG.work.sec;
+let running      = false;
+let timerId      = null;
+let doneInCycle  = 0;    // sessions completed in current 4-session cycle (0-3)
+let breakBank    = 0;    // accumulated break seconds
+let breakAtStart = 0;    // bank value when current break session started (for arc)
 
-/* ── DOM ──────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   DOM
+═══════════════════════════════════════════════════════════════ */
 const arc          = document.getElementById('arc');
 const arcTip       = document.getElementById('arcTip');
 const timeText     = document.getElementById('timeText');
@@ -471,6 +570,10 @@ const icoPause     = document.getElementById('icoPause');
 const btnReset     = document.getElementById('btnReset');
 const btnSkip      = document.getElementById('btnSkip');
 const sessionLabel = document.getElementById('sessionLabel');
+const bankRow      = document.getElementById('bankRow');
+const bankTime     = document.getElementById('bankTime');
+const tabPause     = document.getElementById('tabPause');
+const earnedToast  = document.getElementById('earnedToast');
 const dots         = [1,2,3,4].map(i => document.getElementById('d'+i));
 const g0  = document.getElementById('g0');
 const g1  = document.getElementById('g1');
@@ -478,11 +581,13 @@ const g2  = document.getElementById('g2');
 const ig0 = document.getElementById('ig0');
 const ig1 = document.getElementById('ig1');
 
-/* ── Init arc ─────────────────────────────────────────────────── */
+/* ── Init arc ── */
 arc.style.strokeDasharray  = CIRC;
 arc.style.strokeDashoffset = 0;
 
-/* ── Stars ────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   STARS
+═══════════════════════════════════════════════════════════════ */
 const starsEl = document.getElementById('stars');
 for (let i = 0; i < 90; i++) {
   const s = document.createElement('div');
@@ -499,28 +604,32 @@ for (let i = 0; i < 90; i++) {
   starsEl.appendChild(s);
 }
 
-/* ── Tick marks ───────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   TICK MARKS
+═══════════════════════════════════════════════════════════════ */
 const tickGroup = document.getElementById('ticks');
-const TICKS = 60;
-for (let i = 0; i < TICKS; i++) {
-  const angle   = (i / TICKS) * 2 * Math.PI - Math.PI / 2;
+for (let i = 0; i < 60; i++) {
+  const angle   = (i / 60) * 2 * Math.PI - Math.PI / 2;
   const isMajor = i % 5 === 0;
   const rInner  = isMajor ? 134 : 137;
-  const rOuter  = 144;
   const ln = document.createElementNS('http://www.w3.org/2000/svg','line');
-  ln.setAttribute('x1', (155 + rInner * Math.cos(angle)).toFixed(2));
-  ln.setAttribute('y1', (155 + rInner * Math.sin(angle)).toFixed(2));
-  ln.setAttribute('x2', (155 + rOuter * Math.cos(angle)).toFixed(2));
-  ln.setAttribute('y2', (155 + rOuter * Math.sin(angle)).toFixed(2));
+  ln.setAttribute('x1', (155 + rInner      * Math.cos(angle)).toFixed(2));
+  ln.setAttribute('y1', (155 + rInner      * Math.sin(angle)).toFixed(2));
+  ln.setAttribute('x2', (155 + 144         * Math.cos(angle)).toFixed(2));
+  ln.setAttribute('y2', (155 + 144         * Math.sin(angle)).toFixed(2));
   ln.setAttribute('stroke', 'white');
   ln.setAttribute('stroke-width', isMajor ? '2' : '1');
   ln.setAttribute('stroke-linecap', 'round');
   tickGroup.appendChild(ln);
 }
 
-/* ── Helpers ──────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════════════════════════════ */
 function fmt(s) {
-  return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
 }
 
 function setCSSVar(name, val) {
@@ -539,22 +648,15 @@ function applyTheme(key) {
   ig0.setAttribute('stop-color', c.ig);
   ig1.setAttribute('stop-color', c.ig);
   arcTip.setAttribute('fill', c.tip);
-  // Update theme-color meta tag
-  const tm = document.querySelector('meta[name="theme-color"]');
-  if (tm) tm.setAttribute('content', '#0a0a18');
 }
 
 function updateArc() {
-  const frac = timeLeft / CFG[mode].sec;
-  const offset = CIRC * (1 - frac);
-  arc.style.strokeDashoffset = offset.toFixed(3);
-
-  // Move tip dot to the end of the arc
+  const total = mode === 'work' ? CFG.work.sec : Math.max(1, breakAtStart);
+  const frac  = Math.max(0, Math.min(1, timeLeft / total));
+  arc.style.strokeDashoffset = (CIRC * (1 - frac)).toFixed(3);
   const angle = (frac * 2 * Math.PI) - Math.PI / 2;
-  const tx = CX + R * Math.cos(angle);
-  const ty = CY + R * Math.sin(angle);
-  arcTip.setAttribute('cx', tx.toFixed(2));
-  arcTip.setAttribute('cy', ty.toFixed(2));
+  arcTip.setAttribute('cx', (CX + R * Math.cos(angle)).toFixed(2));
+  arcTip.setAttribute('cy', (CY + R * Math.sin(angle)).toFixed(2));
   arcTip.setAttribute('opacity', frac > 0.01 ? '0.9' : '0');
 }
 
@@ -562,14 +664,33 @@ function updateDots() {
   dots.forEach((d, i) => d.classList.toggle('done', i < doneInCycle));
 }
 
+function updateBankDisplay() {
+  /* Pause tab: show bank time badge */
+  const hasMoney = breakBank > 0;
+
+  if (mode === 'pause') {
+    tabPause.innerHTML = `Pause <span class="tab-bank">${fmt(timeLeft)}</span>`;
+    tabPause.disabled = false;
+  } else if (hasMoney) {
+    tabPause.innerHTML = `Pause <span class="tab-bank">${fmt(breakBank)}</span>`;
+    tabPause.disabled = false;
+  } else {
+    tabPause.textContent = 'Pause';
+    tabPause.disabled = true;
+  }
+
+  /* Bank row below timer */
+  bankTime.textContent = fmt(breakBank);
+  bankRow.classList.toggle('has-time', hasMoney);
+}
+
 function updateLabel() {
   if (mode === 'work') {
     sessionLabel.textContent = `Sitzung ${doneInCycle + 1} von 4`;
-  } else if (mode === 'short') {
-    sessionLabel.textContent = `Kurze Pause · noch ${4 - doneInCycle} Sitzung(en)`;
   } else {
-    sessionLabel.textContent = 'Lange Pause · neuer Zyklus';
+    sessionLabel.textContent = 'Pause — jederzeit stoppbar';
   }
+  updateBankDisplay();
 }
 
 function refresh() {
@@ -579,21 +700,20 @@ function refresh() {
   updateLabel();
 }
 
-/* ── Mode switch ──────────────────────────────────────────────── */
-function switchMode(key, resetDots) {
-  stopTimer();
-  mode     = key;
-  timeLeft = CFG[key].sec;
-  if (resetDots) doneInCycle = 0;
-  applyTheme(key);
-  modeText.textContent = CFG[key].label;
-  document.querySelectorAll('.tab').forEach(t =>
-    t.classList.toggle('active', t.dataset.mode === key)
-  );
-  refresh();
+/* ═══════════════════════════════════════════════════════════════
+   TOAST
+═══════════════════════════════════════════════════════════════ */
+let toastTimer = null;
+function showToast(msg) {
+  earnedToast.textContent = msg;
+  earnedToast.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => earnedToast.classList.remove('show'), 3200);
 }
 
-/* ── Sound ────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   SOUND
+═══════════════════════════════════════════════════════════════ */
 function playDone() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -614,98 +734,188 @@ function playDone() {
   } catch(_) {}
 }
 
-/* ── Vibration (mobile) ───────────────────────────────────────── */
 function vibrate(pattern) {
   if ('vibrate' in navigator) navigator.vibrate(pattern);
 }
 
-/* ── Flash body ───────────────────────────────────────────────── */
 function flashBody() {
   document.body.classList.remove('flash');
-  void document.body.offsetWidth; // reflow
+  void document.body.offsetWidth;
   document.body.classList.add('flash');
   setTimeout(() => document.body.classList.remove('flash'), 800);
 }
 
-/* ── Timer complete ───────────────────────────────────────────── */
-function onComplete() {
+function notifyUser(msg) {
+  if (Notification && Notification.permission === 'granted') {
+    new Notification('Pomodoro', {
+      body: msg,
+      icon: 'icons/icon-192.svg',
+      silent: true,
+    });
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SWITCH MODE
+═══════════════════════════════════════════════════════════════ */
+function switchMode(key) {
+  stopTimer();
+
+  /* Guard: can't switch to pause without a bank balance */
+  if (key === 'pause' && breakBank <= 0) return;
+
+  mode = key;
+
+  if (key === 'work') {
+    timeLeft = CFG.work.sec;
+  } else {
+    /* Pause: timer counts down from whatever is in the bank */
+    breakAtStart = breakBank;
+    timeLeft     = breakBank;
+  }
+
+  applyTheme(key);
+  modeText.textContent = CFG[key].label;
+  document.querySelectorAll('.tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.mode === key)
+  );
+  refresh();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TIMER COMPLETE HANDLERS
+═══════════════════════════════════════════════════════════════ */
+function onWorkComplete() {
   playDone();
   vibrate([200, 100, 200, 100, 400]);
   flashBody();
 
-  // Notification
-  if (Notification && Notification.permission === 'granted') {
-    const label = mode === 'work' ? 'Fokus-Zeit vorbei!' : 'Pause vorbei!';
-    new Notification('Pomodoro', {
-      body: label + ' Nächste Phase startet.',
-      icon: 'icons/icon-192.svg',
-      badge: 'icons/icon-192.svg',
-      silent: true,
-    });
-  }
+  doneInCycle++;
+  /* Every 4th session earns 15 min, all others earn 5 min */
+  const isLong  = doneInCycle % 4 === 0;
+  const earned  = isLong ? 15*60 : 5*60;
+  breakBank += earned;
+  if (doneInCycle >= 4) doneInCycle = 0;
 
-  if (mode === 'work') {
-    doneInCycle++;
-    if (doneInCycle >= 4) {
-      switchMode('long', false);
-    } else {
-      switchMode('short', false);
-    }
-  } else {
-    const resetDots = mode === 'long';
-    switchMode('work', resetDots);
-  }
+  const earnedLabel = isLong ? '15 Min' : '5 Min';
+  const msg = isLong
+    ? `Langer Zyklus abgeschlossen! +${earnedLabel} Guthaben`
+    : `25 Min geschafft! +${earnedLabel} Guthaben`;
+
+  notifyUser(msg);
+  showToast(msg);
+
+  /* Reset to work mode — user decides when to take the break */
+  switchMode('work');
 }
 
-/* ── Timer control ────────────────────────────────────────────── */
+function onPauseComplete() {
+  /* Break bank fully used up */
+  breakBank = 0;
+  playDone();
+  vibrate([300, 100, 300]);
+  flashBody();
+  notifyUser('Pause vorbei — bereit für den nächsten Fokus-Block?');
+  showToast('Pause aufgebraucht — bereit für den nächsten Fokus-Block?');
+  switchMode('work');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TIMER CONTROL
+═══════════════════════════════════════════════════════════════ */
 function stopTimer() {
   if (timerId) { clearInterval(timerId); timerId = null; }
   running = false;
   btnMain.classList.remove('running');
   icoPlay.style.display  = '';
   icoPause.style.display = 'none';
+  /* Break bank stays in sync (updated every tick in startTimer) */
 }
 
 function startTimer() {
-  // Request notification permission on first start
+  if (mode === 'pause' && breakBank <= 0) return;
+
   if (Notification && Notification.permission === 'default') {
     Notification.requestPermission();
   }
+
   running = true;
   btnMain.classList.add('running');
   icoPlay.style.display  = 'none';
   icoPause.style.display = '';
   vibrate(50);
+
   timerId = setInterval(() => {
     timeLeft--;
+
+    /* Keep break bank in sync with the running timer */
+    if (mode === 'pause') breakBank = Math.max(0, timeLeft);
+
     refresh();
-    if (timeLeft <= 0) { stopTimer(); onComplete(); }
+
+    if (timeLeft <= 0) {
+      clearInterval(timerId);
+      timerId = null;
+      running = false;
+      btnMain.classList.remove('running');
+      icoPlay.style.display  = '';
+      icoPause.style.display = 'none';
+
+      if (mode === 'work') onWorkComplete();
+      else                 onPauseComplete();
+    }
   }, 1000);
 }
 
-function toggleTimer() { running ? stopTimer() : startTimer(); }
+function toggleTimer() {
+  running ? stopTimer() : startTimer();
+}
 
 function resetTimer() {
   stopTimer();
-  timeLeft = CFG[mode].sec;
+  /* Always return to work mode on reset; break bank is preserved */
+  if (mode !== 'work') {
+    mode = 'work';
+    applyTheme('work');
+    modeText.textContent = CFG.work.label;
+    document.querySelectorAll('.tab').forEach(t =>
+      t.classList.toggle('active', t.dataset.mode === 'work')
+    );
+  }
+  timeLeft = CFG.work.sec;
   refresh();
   vibrate(30);
 }
 
 function skipTimer() {
   stopTimer();
-  timeLeft = 0;
-  refresh();
-  setTimeout(onComplete, 80);
+  if (mode === 'work') {
+    /*
+     * Skip = complete work session early with full credits.
+     * The user consciously decided to end the session.
+     */
+    doneInCycle++;
+    const isLong = doneInCycle % 4 === 0;
+    const earned = isLong ? 15*60 : 5*60;
+    breakBank += earned;
+    if (doneInCycle >= 4) doneInCycle = 0;
+    showToast(`+${isLong ? '15' : '5'} Min Guthaben`);
+  }
+  /* For pause mode: skip just ends the pause, remaining bank is preserved */
+  switchMode('work');
 }
 
-/* ── Events ───────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   EVENTS
+═══════════════════════════════════════════════════════════════ */
 btnMain.addEventListener('click',  toggleTimer);
 btnReset.addEventListener('click', resetTimer);
 btnSkip.addEventListener('click',  skipTimer);
 
 document.querySelectorAll('.tab').forEach(tab =>
-  tab.addEventListener('click', () => switchMode(tab.dataset.mode, false))
+  tab.addEventListener('click', () => {
+    if (!tab.disabled) switchMode(tab.dataset.mode);
+  })
 );
 
 document.addEventListener('keydown', e => {
@@ -713,7 +923,9 @@ document.addEventListener('keydown', e => {
   if (e.code === 'KeyR')  resetTimer();
 });
 
-/* ── PWA Install Prompt ───────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   PWA INSTALL
+═══════════════════════════════════════════════════════════════ */
 let deferredInstallPrompt = null;
 const installBanner = document.getElementById('installBanner');
 const btnInstall    = document.getElementById('btnInstall');
@@ -737,14 +949,18 @@ window.addEventListener('appinstalled', () => {
   deferredInstallPrompt = null;
 });
 
-/* ── Service Worker ───────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   SERVICE WORKER
+═══════════════════════════════════════════════════════════════ */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
   });
 }
 
-/* ── Boot ─────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   BOOT
+═══════════════════════════════════════════════════════════════ */
 applyTheme('work');
 refresh();
 </script>
