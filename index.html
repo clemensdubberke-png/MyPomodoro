@@ -542,6 +542,74 @@
       letter-spacing: 0.03em;
     }
 
+    /* ── Header row (title + rules button) ── */
+    .header-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      max-width: 320px;
+      position: relative;
+    }
+    .btn-rules {
+      position: absolute;
+      right: 0;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.03);
+      color: rgba(255,255,255,0.30);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.2s, color 0.2s;
+    }
+    .btn-rules:active { background: rgba(255,255,255,0.10); color: rgba(255,255,255,0.65); }
+
+    /* ── Rules panel content ── */
+    .rules-section {
+      padding: 14px 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .rules-section:last-child { border-bottom: none; }
+    .rules-section-title {
+      font-size: clamp(0.65rem, 1.9vw, 0.72rem);
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      margin-bottom: 9px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .rules-orange { color: #ff9f5e; }
+    .rules-teal   { color: #1dd1a1; }
+    .rules-red    { color: #ff6b6b; }
+    .rules-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 4px 0;
+      font-size: clamp(0.78rem, 2.3vw, 0.84rem);
+      color: rgba(255,255,255,0.58);
+      line-height: 1.55;
+    }
+    .rules-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.25);
+      margin-top: 8px;
+      flex-shrink: 0;
+    }
+    .rules-item.forbidden { color: rgba(255,107,107,0.78); }
+    .rules-item.forbidden .rules-dot { background: #ff6b6b; }
+    .rules-item.exception { color: rgba(255,255,255,0.38); font-style: italic; }
+    .rules-item.exception .rules-dot { background: rgba(255,255,255,0.15); }
+
     /* ── Reward cards ── */
     .rewards-list {
       padding: 16px 16px 0;
@@ -627,6 +695,95 @@
 <div id="stars"></div>
 <div class="earned-toast" id="earnedToast"></div>
 
+<!-- Rules bottom sheet -->
+<div class="rewards-overlay" id="rulesOverlay">
+  <div class="rewards-panel">
+    <div class="rewards-handle"></div>
+    <div class="rewards-header">
+      <div class="rewards-title">Spielregeln</div>
+      <button class="rewards-close" id="btnCloseRules">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <path d="M18 6L6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Vorbereitung -->
+    <div class="rules-section">
+      <div class="rules-section-title rules-orange">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+        </svg>
+        Vorbereitung
+      </div>
+      <div class="rules-item">
+        <span class="rules-dot"></span>
+        <span>Schreibe alle Aufgaben auf, die du erledigen möchtest — bevor der Timer startet</span>
+      </div>
+    </div>
+
+    <!-- Fokus-Phase -->
+    <div class="rules-section">
+      <div class="rules-section-title rules-orange">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <circle cx="12" cy="12" r="10"/>
+          <polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/>
+        </svg>
+        Fokus-Phase
+      </div>
+      <div class="rules-item">
+        <span class="rules-dot"></span>
+        <span>Starte den Timer und arbeite konzentriert ausschließlich an deinen Aufgaben</span>
+      </div>
+      <div class="rules-item">
+        <span class="rules-dot"></span>
+        <span>Jeder abgeschlossene Zyklus bringt dir Pausen-Guthaben — bleib dran</span>
+      </div>
+    </div>
+
+    <!-- Pausen -->
+    <div class="rules-section">
+      <div class="rules-section-title rules-teal">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+        Pausen
+      </div>
+      <div class="rules-item">
+        <span class="rules-dot"></span>
+        <span>Freigeschaltete Pausen kannst du sofort nutzen oder für später ansparen</span>
+      </div>
+      <div class="rules-item">
+        <span class="rules-dot"></span>
+        <span>Nach 4 Fokus-Zyklen erhältst du eine längere Pause und eine Fokus-Münze ✦</span>
+      </div>
+    </div>
+
+    <!-- Verboten -->
+    <div class="rules-section">
+      <div class="rules-section-title rules-red">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+        </svg>
+        Strengstens verboten
+      </div>
+      <div class="rules-item forbidden">
+        <span class="rules-dot"></span>
+        <span>Keine Bildschirmzeit (Handy, Tablet, Fernseher) solange noch Aufgaben offen sind</span>
+      </div>
+      <div class="rules-item exception">
+        <span class="rules-dot"></span>
+        <span>Ausnahme: Freischaltung über das Belohnungsmenü mit Fokus-Münzen</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
 <!-- Rewards bottom sheet -->
 <div class="rewards-overlay" id="rewardsOverlay">
   <div class="rewards-panel">
@@ -676,7 +833,21 @@
 </div>
 
 <div class="app">
-  <div class="title">Pomodoro</div>
+  <div class="header-row">
+    <div class="title">Pomodoro</div>
+    <button class="btn-rules" id="btnRules" title="Spielregeln">
+      <!-- Bulleted list icon -->
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+        <line x1="9" y1="6"  x2="20" y2="6"/>
+        <line x1="9" y1="12" x2="20" y2="12"/>
+        <line x1="9" y1="18" x2="20" y2="18"/>
+        <circle cx="4" cy="6"  r="1.5" fill="currentColor" stroke="none"/>
+        <circle cx="4" cy="12" r="1.5" fill="currentColor" stroke="none"/>
+        <circle cx="4" cy="18" r="1.5" fill="currentColor" stroke="none"/>
+      </svg>
+    </button>
+  </div>
 
   <!-- Mode selector: Fokus + Pause (with bank time) -->
   <div class="tabs">
@@ -1254,6 +1425,16 @@ document.querySelectorAll('.tab').forEach(tab =>
     }
   })
 );
+
+/* ── Rules modal ── */
+const rulesOverlay  = document.getElementById('rulesOverlay');
+const btnRules      = document.getElementById('btnRules');
+const btnCloseRules = document.getElementById('btnCloseRules');
+btnRules.addEventListener('click', () => rulesOverlay.classList.add('open'));
+btnCloseRules.addEventListener('click', () => rulesOverlay.classList.remove('open'));
+rulesOverlay.addEventListener('click', e => {
+  if (e.target === rulesOverlay) rulesOverlay.classList.remove('open');
+});
 
 /* ── Rewards modal ── */
 btnRewards.addEventListener('click', () => rewardsOverlay.classList.add('open'));

@@ -1,5 +1,5 @@
 /* ── Pomodoro Timer – Service Worker ── */
-const CACHE = 'pomodoro-v6';
+const CACHE = 'pomodoro-v7';
 const ASSETS = [
   './',
   './index.html',
