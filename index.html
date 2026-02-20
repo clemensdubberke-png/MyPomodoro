@@ -541,6 +541,85 @@
       line-height: 1.75;
       letter-spacing: 0.03em;
     }
+
+    /* ── Reward cards ── */
+    .rewards-list {
+      padding: 16px 16px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .reward-card {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      padding: 13px 14px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 16px;
+    }
+    .reward-icon-circle {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: rgba(29,209,161,0.10);
+      border: 1px solid rgba(29,209,161,0.22);
+      color: #1dd1a1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .reward-info { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+    .reward-name {
+      font-size: clamp(0.78rem, 2.4vw, 0.88rem);
+      font-weight: 600;
+      color: rgba(255,255,255,0.82);
+    }
+    .reward-duration {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.74em;
+      color: #1dd1a1;
+      opacity: 0.80;
+    }
+    .reward-right {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .reward-cost {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #ffe566;
+      letter-spacing: 0.03em;
+    }
+    .btn-buy {
+      padding: 6px 15px;
+      border-radius: 100px;
+      border: none;
+      background: #1dd1a1;
+      color: #001810;
+      font-family: inherit;
+      font-size: 0.76rem;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.05em;
+      transition: opacity 0.25s, transform 0.15s, background 0.3s, color 0.3s;
+      -webkit-tap-highlight-color: transparent;
+      white-space: nowrap;
+    }
+    .btn-buy:active { transform: scale(0.92); }
+    .btn-buy:not(.can-afford) {
+      background: rgba(255,255,255,0.07);
+      color: rgba(255,255,255,0.28);
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
@@ -569,21 +648,29 @@
       <div class="rewards-balance-amount" id="rewardsCoinBalance">0</div>
     </div>
 
-    <!-- Empty state (placeholder for future rewards) -->
-    <div class="rewards-empty">
-      <div class="rewards-empty-icon">
-        <svg width="56" height="56" viewBox="0 0 24 24" fill="none"
-             stroke="currentColor" stroke-width="1.1"
-             stroke-linecap="round" stroke-linejoin="round">
-          <path d="M20 12v10H4V12"/>
-          <path d="M22 7H2v5h20V7z"/>
-          <path d="M12 22V7"/>
-          <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/>
-          <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
-        </svg>
+    <!-- Reward list -->
+    <div class="rewards-list">
+
+      <!-- Reward: 30 min extra break -->
+      <div class="reward-card">
+        <!-- Moon icon in teal circle — represents rest/break -->
+        <div class="reward-icon-circle">
+          <svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+        </div>
+
+        <div class="reward-info">
+          <div class="reward-name">Extra-Pause</div>
+          <div class="reward-duration">+30 Minuten</div>
+        </div>
+
+        <div class="reward-right">
+          <div class="reward-cost"><span>✦</span> 3</div>
+          <button class="btn-buy" id="btnBuy30min">Kaufen</button>
+        </div>
       </div>
-      <p class="rewards-empty-text">Hier erscheinen bald<br>deine Belohnungen.<br><br>
-        Sammle Münzen, indem du<br>4 Fokus-Zyklen abschließt.</p>
+
     </div>
   </div>
 </div>
@@ -795,6 +882,7 @@ const coinCountDisplay = document.getElementById('coinCountDisplay');
 const rewardsOverlay   = document.getElementById('rewardsOverlay');
 const rewardsCoinBal   = document.getElementById('rewardsCoinBalance');
 const btnCloseRewards  = document.getElementById('btnCloseRewards');
+const btnBuy30min      = document.getElementById('btnBuy30min');
 const g0  = document.getElementById('g0');
 const g1  = document.getElementById('g1');
 const g2  = document.getElementById('g2');
@@ -990,6 +1078,7 @@ function updateCoinDisplay() {
   coinCountDisplay.textContent = coins;
   rewardsCoinBal.textContent   = coins;
   btnRewards.classList.toggle('has-coins', coins > 0);
+  btnBuy30min.classList.toggle('can-afford', coins >= 3);
 }
 
 /* Updates tab highlight + viewMode without touching the timer */
@@ -1172,6 +1261,32 @@ btnCloseRewards.addEventListener('click', () => rewardsOverlay.classList.remove(
 rewardsOverlay.addEventListener('click', e => {
   if (e.target === rewardsOverlay) rewardsOverlay.classList.remove('open');
 });
+
+/* ── Reward: 30 min extra break ── */
+function buyExtraBreak30() {
+  if (coins < 3) {
+    showToast('Nicht genug Münzen — du brauchst 3 ✦');
+    vibrate(40);
+    return;
+  }
+  coins -= 3;
+  updateCoinDisplay();
+
+  const bonus = 30 * 60; // 1 800 seconds
+  breakBank += bonus;
+
+  /* If a pause is actively running, extend the live countdown as well */
+  if (mode === 'pause') {
+    timeLeft     += bonus;
+    breakAtStart  = Math.max(breakAtStart, timeLeft);
+    if (running) startLeft += bonus; // keeps epoch-based calc correct
+  }
+
+  refresh();
+  showToast('+30 Min Pause gutgeschrieben!');
+  vibrate([80, 40, 120]);
+}
+btnBuy30min.addEventListener('click', buyExtraBreak30);
 
 document.addEventListener('keydown', e => {
   if (e.code === 'Space') { e.preventDefault(); toggleTimer(); }
