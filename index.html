@@ -688,12 +688,207 @@
       color: rgba(255,255,255,0.28);
       cursor: not-allowed;
     }
+
+    /* ── Screen-time reward extras ── */
+    .reward-icon--screen {
+      background: rgba(167,139,250,0.10);
+      border-color: rgba(167,139,250,0.22);
+      color: #a78bfa;
+    }
+    .st-bank-row {
+      display: none;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.72em;
+      color: #a78bfa;
+      opacity: 0.85;
+      margin-top: 1px;
+    }
+    .btn-use-st {
+      display: none;
+      padding: 6px 13px;
+      border-radius: 100px;
+      border: 1px solid rgba(167,139,250,0.35);
+      background: rgba(167,139,250,0.10);
+      color: #a78bfa;
+      font-family: inherit;
+      font-size: 0.74rem;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.2s, transform 0.15s;
+    }
+    .btn-use-st:active { transform: scale(0.92); }
+    .screen-time-card.has-bank .st-bank-row { display: block; }
+    .screen-time-card.has-bank .btn-use-st  { display: block; }
+
+    /* ── Confirmation dialog ── */
+    .confirm-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 300;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,12,0.65);
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+    .confirm-overlay.open { opacity: 1; pointer-events: all; }
+    .confirm-box {
+      background: linear-gradient(160deg, #161632 0%, #0e0e22 100%);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 20px;
+      padding: 28px 24px 22px;
+      max-width: 300px;
+      width: 90%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      text-align: center;
+    }
+    .confirm-icon { color: #a78bfa; margin-bottom: 4px; }
+    .confirm-title {
+      font-size: clamp(0.90rem, 2.8vw, 1rem);
+      font-weight: 600;
+      color: rgba(255,255,255,0.88);
+    }
+    .confirm-sub {
+      font-size: 0.80rem;
+      color: rgba(255,255,255,0.38);
+      font-family: 'Space Mono', monospace;
+    }
+    .confirm-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 8px;
+      width: 100%;
+    }
+    .btn-cancel-st {
+      flex: 1;
+      padding: 11px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(255,255,255,0.05);
+      color: rgba(255,255,255,0.50);
+      font-family: inherit;
+      font-size: 0.84rem;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-start-st {
+      flex: 1;
+      padding: 11px;
+      border-radius: 12px;
+      border: none;
+      background: #a78bfa;
+      color: #0d0820;
+      font-family: inherit;
+      font-size: 0.84rem;
+      font-weight: 700;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-start-st:active { opacity: 0.85; }
+
+    /* ── Screen-time banner (slides down from top) ── */
+    .screen-time-banner {
+      position: fixed;
+      top: calc(var(--sat) + 12px);
+      left: 50%;
+      transform: translateX(-50%) translateY(calc(-100% - 20px));
+      z-index: 250;
+      background: rgba(8,6,24,0.94);
+      border: 1px solid rgba(167,139,250,0.25);
+      border-radius: 100px;
+      padding: 9px 14px 9px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      transition: transform 0.42s cubic-bezier(0.22,1,0.36,1);
+      white-space: nowrap;
+    }
+    .screen-time-banner.active {
+      transform: translateX(-50%) translateY(0);
+    }
+    .stb-icon { color: #a78bfa; display: flex; align-items: center; }
+    .stb-info  { display: flex; flex-direction: column; gap: 1px; }
+    .stb-label {
+      font-size: 0.58rem;
+      color: rgba(255,255,255,0.35);
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+    .stb-time {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.90rem;
+      font-weight: 700;
+      color: #c4b5fd;
+    }
+    .stb-end {
+      padding: 5px 12px;
+      border-radius: 100px;
+      border: 1px solid rgba(167,139,250,0.30);
+      background: rgba(167,139,250,0.12);
+      color: #a78bfa;
+      font-family: inherit;
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.2s;
+    }
+    .stb-end:active { background: rgba(167,139,250,0.25); }
   </style>
 </head>
 <body>
 
 <div id="stars"></div>
 <div class="earned-toast" id="earnedToast"></div>
+
+<!-- Screen-time active banner (slides in from top) -->
+<div class="screen-time-banner" id="screenTimeBanner">
+  <div class="stb-icon">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <rect x="2" y="3" width="20" height="14" rx="2"/>
+      <line x1="8" y1="21" x2="16" y2="21"/>
+      <line x1="12" y1="17" x2="12" y2="21"/>
+    </svg>
+  </div>
+  <div class="stb-info">
+    <div class="stb-label">Bildschirmzeit</div>
+    <div class="stb-time" id="stbTime">15:00</div>
+  </div>
+  <button class="stb-end" id="btnEndST">Beenden</button>
+</div>
+
+<!-- Screen-time start confirmation -->
+<div class="confirm-overlay" id="confirmSTOverlay">
+  <div class="confirm-box">
+    <div class="confirm-icon">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+        <rect x="2" y="3" width="20" height="14" rx="2"/>
+        <line x1="8" y1="21" x2="16" y2="21"/>
+        <line x1="12" y1="17" x2="12" y2="21"/>
+      </svg>
+    </div>
+    <div class="confirm-title">Bildschirmzeit starten?</div>
+    <div class="confirm-sub" id="confirmSTSub">15:00 verfügbar</div>
+    <div class="confirm-actions">
+      <button class="btn-cancel-st" id="btnSTCancel">Abbrechen</button>
+      <button class="btn-start-st"  id="btnSTStart">Starten</button>
+    </div>
+  </div>
+</div>
 
 <!-- Rules bottom sheet -->
 <div class="rewards-overlay" id="rulesOverlay">
@@ -825,6 +1020,31 @@
         <div class="reward-right">
           <div class="reward-cost"><span>✦</span> 3</div>
           <button class="btn-buy" id="btnBuy30min">Kaufen</button>
+        </div>
+      </div>
+
+      <!-- Reward: 15 min screen time -->
+      <div class="reward-card screen-time-card" id="screenTimeCard">
+        <!-- Monitor icon in purple circle -->
+        <div class="reward-icon-circle reward-icon--screen">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
+            <rect x="2" y="3" width="20" height="14" rx="2"/>
+            <line x1="8" y1="21" x2="16" y2="21"/>
+            <line x1="12" y1="17" x2="12" y2="21"/>
+          </svg>
+        </div>
+
+        <div class="reward-info">
+          <div class="reward-name">Bildschirmzeit</div>
+          <div class="reward-duration">+15 Minuten</div>
+          <div class="st-bank-row">⏱ <span id="stBankDisplay">0:00</span> verfügbar</div>
+        </div>
+
+        <div class="reward-right">
+          <div class="reward-cost"><span>✦</span> 2</div>
+          <button class="btn-buy" id="btnBuyScreenTime">Kaufen</button>
+          <button class="btn-use-st" id="btnUseScreenTime">Nutzen</button>
         </div>
       </div>
 
@@ -1030,6 +1250,11 @@ let startEpoch   = null;  // Date.now() when timer last started/resumed
 let startLeft    = null;  // timeLeft value when timer last started/resumed
 let viewMode     = 'work'; // which tab the UI is currently showing (can differ from mode)
 let coins        = 0;      // reward currency earned after every 4-session cycle
+let screenTimeBank    = 0;     // accumulated screen-time seconds
+let screenTimeRunning = false;
+let screenTimeEpoch   = null;  // Date.now() when screen-time session started
+let screenTimeInit    = 0;     // screenTimeBank value at start of session
+let screenTimeTimerId = null;
 
 /* ═══════════════════════════════════════════════════════════════
    DOM
@@ -1053,7 +1278,18 @@ const coinCountDisplay = document.getElementById('coinCountDisplay');
 const rewardsOverlay   = document.getElementById('rewardsOverlay');
 const rewardsCoinBal   = document.getElementById('rewardsCoinBalance');
 const btnCloseRewards  = document.getElementById('btnCloseRewards');
-const btnBuy30min      = document.getElementById('btnBuy30min');
+const btnBuy30min       = document.getElementById('btnBuy30min');
+const screenTimeCard    = document.getElementById('screenTimeCard');
+const btnBuyScreenTime  = document.getElementById('btnBuyScreenTime');
+const btnUseScreenTime  = document.getElementById('btnUseScreenTime');
+const stBankDisplay     = document.getElementById('stBankDisplay');
+const confirmSTOverlay  = document.getElementById('confirmSTOverlay');
+const confirmSTSub      = document.getElementById('confirmSTSub');
+const btnSTCancel       = document.getElementById('btnSTCancel');
+const btnSTStart        = document.getElementById('btnSTStart');
+const screenTimeBanner  = document.getElementById('screenTimeBanner');
+const stbTime           = document.getElementById('stbTime');
+const btnEndST          = document.getElementById('btnEndST');
 const g0  = document.getElementById('g0');
 const g1  = document.getElementById('g1');
 const g2  = document.getElementById('g2');
@@ -1250,6 +1486,13 @@ function updateCoinDisplay() {
   rewardsCoinBal.textContent   = coins;
   btnRewards.classList.toggle('has-coins', coins > 0);
   btnBuy30min.classList.toggle('can-afford', coins >= 3);
+  btnBuyScreenTime.classList.toggle('can-afford', coins >= 2);
+}
+
+function updateScreenTimeUI() {
+  const has = screenTimeBank > 0;
+  screenTimeCard.classList.toggle('has-bank', has);
+  if (has) stBankDisplay.textContent = fmt(screenTimeBank);
 }
 
 /* Updates tab highlight + viewMode without touching the timer */
@@ -1469,6 +1712,83 @@ function buyExtraBreak30() {
 }
 btnBuy30min.addEventListener('click', buyExtraBreak30);
 
+/* ── Screen-time reward ── */
+function buyScreenTime() {
+  if (coins < 2) {
+    showToast('Nicht genug Münzen — du brauchst 2 ✦');
+    vibrate(40);
+    return;
+  }
+  coins -= 2;
+  screenTimeBank += 15 * 60; // 900 s
+  updateCoinDisplay();
+  updateScreenTimeUI();
+  showToast('+15 Min Bildschirmzeit gutgeschrieben!');
+  vibrate([60, 30, 60]);
+}
+
+function stTick() {
+  if (!screenTimeRunning || screenTimeEpoch === null) return;
+  const elapsed   = Math.floor((Date.now() - screenTimeEpoch) / 1000);
+  const remaining = Math.max(0, screenTimeInit - elapsed);
+  /* Keep bank in sync so the card stays accurate */
+  screenTimeBank = remaining;
+  stbTime.textContent     = fmt(remaining);
+  updateScreenTimeUI();
+  if (remaining <= 0) {
+    clearInterval(screenTimeTimerId); screenTimeTimerId = null;
+    screenTimeRunning = false; screenTimeEpoch = null;
+    screenTimeBanner.classList.remove('active');
+    playDone();
+    vibrate([200, 100, 200]);
+    showToast('Bildschirmzeit aufgebraucht!');
+  }
+}
+
+function startScreenTime() {
+  if (screenTimeBank <= 0) return;
+  screenTimeRunning = true;
+  screenTimeEpoch   = Date.now();
+  screenTimeInit    = screenTimeBank;
+  stbTime.textContent = fmt(screenTimeBank);
+  screenTimeBanner.classList.add('active');
+  screenTimeTimerId = setInterval(stTick, 1000);
+  vibrate(80);
+}
+
+function endScreenTimeEarly() {
+  if (!screenTimeRunning) return;
+  const elapsed  = Math.floor((Date.now() - screenTimeEpoch) / 1000);
+  screenTimeBank = Math.max(0, screenTimeInit - elapsed);
+  clearInterval(screenTimeTimerId); screenTimeTimerId = null;
+  screenTimeRunning = false; screenTimeEpoch = null;
+  screenTimeBanner.classList.remove('active');
+  updateScreenTimeUI();
+  updateCoinDisplay();
+  const msg = screenTimeBank > 0
+    ? `Beendet — ${fmt(screenTimeBank)} verbleiben`
+    : 'Bildschirmzeit aufgebraucht';
+  showToast(msg);
+  vibrate(40);
+}
+
+btnBuyScreenTime.addEventListener('click', buyScreenTime);
+
+btnUseScreenTime.addEventListener('click', () => {
+  confirmSTSub.textContent = fmt(screenTimeBank) + ' verfügbar';
+  confirmSTOverlay.classList.add('open');
+  rewardsOverlay.classList.remove('open');
+});
+
+btnSTCancel.addEventListener('click', () => confirmSTOverlay.classList.remove('open'));
+
+btnSTStart.addEventListener('click', () => {
+  confirmSTOverlay.classList.remove('open');
+  startScreenTime();
+});
+
+btnEndST.addEventListener('click', endScreenTimeEarly);
+
 document.addEventListener('keydown', e => {
   if (e.code === 'Space') { e.preventDefault(); toggleTimer(); }
   if (e.code === 'KeyR')  resetTimer();
@@ -1478,7 +1798,10 @@ document.addEventListener('keydown', e => {
    immediately recalculate timeLeft from the real elapsed time so the
    display is never stale (mobile browsers throttle/freeze setInterval). */
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && running) tick();
+  if (!document.hidden) {
+    if (running)            tick();
+    if (screenTimeRunning)  stTick();
+  }
 });
 
 /* ═══════════════════════════════════════════════════════════════
@@ -1522,6 +1845,7 @@ if ('serviceWorker' in navigator) {
 applyTheme('work');
 refresh();
 updateCoinDisplay();
+updateScreenTimeUI();
 </script>
 </body>
 </html>
