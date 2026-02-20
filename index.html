@@ -1530,7 +1530,9 @@ let screenTimeInit    = 0;     // screenTimeBank value at start of session
 let screenTimeTimerId = null;
 
 let extraBreakBank = 0;    // purchased extra-pause seconds waiting to be used
-let sliderContext   = null; // 'screenTime' | 'break'
+let breakBankReserved = 0; // portion of breakBank NOT in the current pause session
+let overtimeCredits   = 0; // how many 25-min work blocks have been credited this run
+let sliderContext   = null; // 'screenTime' | 'break' | 'earnedBreak'
 
 let secretCode   = localStorage.getItem('pomodoroSecretCode') || '';
 let codeRevealed = false;  // always starts hidden on fresh page load
@@ -1719,7 +1721,7 @@ function updateBankDisplay() {
   const hasMoney = breakBank > 0;
 
   if (mode === 'pause') {
-    tabPause.innerHTML = `Pause <span class="tab-bank">${fmt(Math.max(0, timeLeft))}</span>`;
+    tabPause.innerHTML = `Pause <span class="tab-bank">${fmt(breakBank)}</span>`;
     tabPause.disabled = false;
   } else if (hasMoney) {
     tabPause.innerHTML = `Pause <span class="tab-bank">${fmt(breakBank)}</span>`;
@@ -1877,6 +1879,8 @@ function setViewTab(key) {
 function switchMode(key) {
   stopTimer();
   overtime = false;
+  overtimeCredits   = 0;
+  breakBankReserved = 0;
 
   /* Guard: can't switch to pause without a bank balance */
   if (key === 'pause' && breakBank <= 0) return;
@@ -1936,7 +1940,7 @@ function tick() {
   timeLeft = startLeft - elapsed;
 
   if (mode === 'pause') {
-    breakBank = Math.max(0, timeLeft);
+    breakBank = breakBankReserved + Math.max(0, timeLeft);
     refresh();
     if (timeLeft <= 0) {
       clearInterval(timerId); timerId = null; running = false;
@@ -1949,25 +1953,30 @@ function tick() {
     return;
   }
 
-  /* Work mode: signal once when the 25-min mark is crossed.
-     The timer keeps running — user stops it manually. */
-  if (timeLeft <= 0 && !overtime) {
+  /* Work mode: credit a break block for every completed 25-min span.
+     overtimeCredits tracks how many have already been paid out so
+     the user earns credit for 25 min, 50 min, 75 min, … of work. */
+  const blocksDue = timeLeft <= 0 ? (Math.floor(-timeLeft / CFG.work.sec) + 1) : 0;
+  if (blocksDue > overtimeCredits) {
     overtime = true;
-    doneInCycle++;
-    const isLong  = doneInCycle % 4 === 0;
-    const earned  = isLong ? 15*60 : 5*60;
-    breakBank += earned;
-    if (isLong) { coins++; updateCoinDisplay(); }
-    if (doneInCycle >= 4) doneInCycle = 0;
-    saveState();
-    const earnedLabel = isLong ? '15 Min' : '5 Min';
-    const msg = isLong
-      ? `Langer Zyklus! +${earnedLabel} — stoppe wenn du Pause machen willst`
-      : `25 Min geschafft! +${earnedLabel} — stoppe wenn du Pause machen willst`;
-    vibrate([200, 100, 200, 100, 400]);
-    flashBody();
-    notifyUser(msg);
-    showToast(msg);
+    while (overtimeCredits < blocksDue) {
+      overtimeCredits++;
+      doneInCycle++;
+      const isLong  = doneInCycle % 4 === 0;
+      const earned  = isLong ? 15*60 : 5*60;
+      breakBank += earned;
+      if (isLong) { coins++; updateCoinDisplay(); }
+      if (doneInCycle >= 4) doneInCycle = 0;
+      saveState();
+      const earnedLabel = isLong ? '15 Min' : '5 Min';
+      const msg = isLong
+        ? `Langer Zyklus! +${earnedLabel} — stoppe wenn du Pause machen willst`
+        : `25 Min geschafft! +${earnedLabel} — stoppe wenn du Pause machen willst`;
+      vibrate([200, 100, 200, 100, 400]);
+      flashBody();
+      notifyUser(msg);
+      showToast(msg);
+    }
   }
 
   refresh();
@@ -1996,9 +2005,8 @@ function startTimer() {
 function toggleTimer() {
   if (viewMode === 'pause' && mode === 'work') {
     /* User is on the Pause tab while work mode is active
-       → stop the work timer and actively start the break */
-    switchMode('pause');
-    startTimer();
+       → let them choose how many minutes via the slider */
+    openSlider('earnedBreak');
   } else {
     running ? stopTimer() : startTimer();
   }
@@ -2007,6 +2015,8 @@ function toggleTimer() {
 function resetTimer() {
   stopTimer();
   overtime = false;
+  overtimeCredits   = 0;
+  breakBankReserved = 0;
   /* Always return to work mode on reset; break bank is preserved */
   if (mode !== 'work' || viewMode !== 'work') {
     mode = 'work';
@@ -2028,9 +2038,14 @@ document.querySelectorAll('.tab').forEach(tab =>
   tab.addEventListener('click', () => {
     if (tab.disabled) return;
     const target = tab.dataset.mode;
+    if (target === 'pause') {
+      /* Always route pause through the slider so the user can choose
+         how many minutes to take — never consume the full bank silently. */
+      openSlider('earnedBreak');
+      return;
+    }
     if (running && mode === 'work') {
-      /* Work timer is running: only update the view, don't touch the timer.
-         The break starts only when the user explicitly presses play. */
+      /* Work timer is running: only update the view, don't touch the timer. */
       setViewTab(target);
     } else {
       switchMode(target);
@@ -2146,7 +2161,9 @@ function updateSliderTrack() {
 function updateSliderDisplay() {
   const mins      = parseInt(timeSlider.value);
   const chosen    = mins * 60;
-  const bank      = sliderContext === 'screenTime' ? screenTimeBank : extraBreakBank;
+  const bank      = sliderContext === 'screenTime'  ? screenTimeBank
+                  : sliderContext === 'earnedBreak'  ? breakBank
+                  :                                   extraBreakBank;
   const remaining = bank - chosen;
   sliderDisplay.textContent   = fmt(chosen);
   sliderRemaining.textContent = remaining > 0
@@ -2156,7 +2173,9 @@ function updateSliderDisplay() {
 }
 
 function openSlider(ctx) {
-  const bank    = ctx === 'screenTime' ? screenTimeBank : extraBreakBank;
+  const bank    = ctx === 'screenTime' ? screenTimeBank
+                : ctx === 'earnedBreak' ? breakBank
+                :                        extraBreakBank;
   const maxMins = Math.floor(bank / 60);
   if (maxMins < 1) {
     showToast('Nicht genug Guthaben (mind. 1 Minute)');
@@ -2168,7 +2187,9 @@ function openSlider(ctx) {
   sliderOverlay.style.setProperty('--slider-color', color);
   sliderIcon.innerHTML    = ctx === 'screenTime' ? _stSVG : _breakSVG;
   sliderIcon.style.color  = color;
-  sliderTitle.textContent = ctx === 'screenTime' ? 'Wie viel Bildschirmzeit?' : 'Wie viel Zusatzpause?';
+  sliderTitle.textContent = ctx === 'screenTime'  ? 'Wie viel Bildschirmzeit?'
+                          : ctx === 'earnedBreak'  ? 'Wie lange möchtest du Pause machen?'
+                          :                          'Wie viel Zusatzpause?';
   timeSlider.min   = 1;
   timeSlider.max   = maxMins;
   timeSlider.value = maxMins;
@@ -2190,6 +2211,14 @@ btnSliderStart.addEventListener('click', () => {
     screenTimeBank -= chosen;
     updateScreenTimeUI();
     startScreenTime(chosen);
+  } else if (sliderContext === 'earnedBreak') {
+    /* Start a partial break from the earned break bank.
+       Keep the unspent portion in breakBankReserved so tick()
+       shows the correct total (reserved + session remaining). */
+    breakBankReserved = breakBank - chosen;
+    breakBank = chosen;          // switchMode reads breakBank → sets timeLeft = chosen
+    switchMode('pause');
+    startTimer();
   } else {
     extraBreakBank -= chosen;
     updateBreakCardUI();
@@ -2269,13 +2298,19 @@ document.addEventListener('keydown', e => {
 
 /* When the app comes back to the foreground after being backgrounded,
    immediately recalculate timeLeft from the real elapsed time so the
-   display is never stale (mobile browsers throttle/freeze setInterval). */
+   display is never stale (mobile browsers throttle/freeze setInterval).
+   When the app goes to the background, save state so coins/banks survive
+   if the OS kills the process while backgrounded. */
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) {
+  if (document.hidden) {
+    saveState();
+  } else {
     if (running)            tick();
     if (screenTimeRunning)  stTick();
   }
 });
+
+window.addEventListener('beforeunload', saveState);
 
 /* ═══════════════════════════════════════════════════════════════
    PWA INSTALL
