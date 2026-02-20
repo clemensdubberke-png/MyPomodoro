@@ -1876,11 +1876,10 @@ function setViewTab(key) {
 /* ═══════════════════════════════════════════════════════════════
    SWITCH MODE
 ═══════════════════════════════════════════════════════════════ */
-function switchMode(key) {
+function switchMode(key, sessionSecs = null) {
   stopTimer();
-  overtime = false;
-  overtimeCredits   = 0;
-  breakBankReserved = 0;
+  overtime      = false;
+  overtimeCredits = 0;
 
   /* Guard: can't switch to pause without a bank balance */
   if (key === 'pause' && breakBank <= 0) return;
@@ -1888,11 +1887,17 @@ function switchMode(key) {
   mode = key;
 
   if (key === 'work') {
-    timeLeft = CFG.work.sec;
+    timeLeft          = CFG.work.sec;
+    breakBankReserved = 0;           // clear reserved only when going back to work
   } else {
-    /* Pause: timer counts down from whatever is in the bank */
-    breakAtStart = breakBank;
-    timeLeft     = breakBank;
+    /* Pause: use sessionSecs if provided (partial break via slider),
+       otherwise consume the entire bank.
+       breakBank itself is NOT changed here — tick() always recomputes it
+       as breakBankReserved + remaining, so it always shows the correct total. */
+    const usedSecs    = sessionSecs !== null ? sessionSecs : breakBank;
+    breakBankReserved = breakBank - usedSecs;
+    breakAtStart      = usedSecs;
+    timeLeft          = usedSecs;
   }
 
   setViewTab(key);
@@ -1905,14 +1910,20 @@ function switchMode(key) {
    TIMER COMPLETE HANDLERS
 ═══════════════════════════════════════════════════════════════ */
 function onPauseComplete() {
-  /* Break bank fully used up */
-  breakBank = 0;
+  /* Session timer ran out. The last tick already set
+     breakBank = breakBankReserved + 0 = reserved unspent portion.
+     Just clear the tracking variable — breakBank is already correct. */
+  breakBankReserved = 0;
   saveState();
   playBreakEnd();
   vibrate([300, 100, 300]);
   flashBody();
-  notifyUser('Pause vorbei — bereit für den nächsten Fokus-Block?');
-  showToast('Pause aufgebraucht — bereit für den nächsten Fokus-Block?');
+  const stillHas = breakBank > 0;
+  const msg = stillHas
+    ? `Pause vorbei — noch ${fmt(breakBank)} Guthaben übrig`
+    : 'Pause aufgebraucht — bereit für den nächsten Fokus-Block?';
+  notifyUser(msg);
+  showToast(msg);
   switchMode('work');
 }
 
@@ -2212,12 +2223,9 @@ btnSliderStart.addEventListener('click', () => {
     updateScreenTimeUI();
     startScreenTime(chosen);
   } else if (sliderContext === 'earnedBreak') {
-    /* Start a partial break from the earned break bank.
-       Keep the unspent portion in breakBankReserved so tick()
-       shows the correct total (reserved + session remaining). */
-    breakBankReserved = breakBank - chosen;
-    breakBank = chosen;          // switchMode reads breakBank → sets timeLeft = chosen
-    switchMode('pause');
+    /* switchMode('pause', chosen) sets up breakBankReserved and timeLeft.
+       breakBank itself is left untouched so it shows the correct total. */
+    switchMode('pause', chosen);
     startTimer();
   } else {
     extraBreakBank -= chosen;
