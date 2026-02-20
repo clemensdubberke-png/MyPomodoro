@@ -493,14 +493,6 @@
       </svg>
     </button>
 
-    <button class="btn-icon" id="btnSkip" title="Sitzung beenden">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-           stroke="currentColor" stroke-width="2.5"
-           stroke-linecap="round" stroke-linejoin="round">
-        <polygon points="5,4 15,12 5,20"/>
-        <line x1="19" y1="4" x2="19" y2="20"/>
-      </svg>
-    </button>
   </div>
 
   <!-- Session info + break bank -->
@@ -568,7 +560,6 @@ const btnMain      = document.getElementById('btnMain');
 const icoPlay      = document.getElementById('icoPlay');
 const icoPause     = document.getElementById('icoPause');
 const btnReset     = document.getElementById('btnReset');
-const btnSkip      = document.getElementById('btnSkip');
 const sessionLabel = document.getElementById('sessionLabel');
 const bankRow      = document.getElementById('bankRow');
 const bankTime     = document.getElementById('bankTime');
@@ -887,31 +878,11 @@ function resetTimer() {
   vibrate(30);
 }
 
-function skipTimer() {
-  stopTimer();
-  if (mode === 'work') {
-    /*
-     * Skip = complete work session early with full credits.
-     * The user consciously decided to end the session.
-     */
-    doneInCycle++;
-    const isLong = doneInCycle % 4 === 0;
-    const earned = isLong ? 15*60 : 5*60;
-    breakBank += earned;
-    if (doneInCycle >= 4) doneInCycle = 0;
-    showToast(`+${isLong ? '15' : '5'} Min Guthaben`);
-  }
-  /* For pause mode: skip just ends the pause, remaining bank is preserved */
-  switchMode('work');
-}
-
 /* ═══════════════════════════════════════════════════════════════
    EVENTS
 ═══════════════════════════════════════════════════════════════ */
 btnMain.addEventListener('click',  toggleTimer);
 btnReset.addEventListener('click', resetTimer);
-btnSkip.addEventListener('click',  skipTimer);
-
 document.querySelectorAll('.tab').forEach(tab =>
   tab.addEventListener('click', () => {
     if (!tab.disabled) switchMode(tab.dataset.mode);
