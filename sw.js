@@ -1,4 +1,17 @@
 /* ── Pomodoro Timer – Service Worker ── */
+
+/* Notification click: Tap auf die Push-Notification öffnet / fokussiert die App */
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then(list => {
+        const existing = list.find(c => c.url && 'focus' in c);
+        if (existing) return existing.focus();
+        return clients.openWindow('./');
+      })
+  );
+});
 const CACHE = 'pomodoro-v11';
 
 /* Static assets that rarely change — safe to serve from cache */

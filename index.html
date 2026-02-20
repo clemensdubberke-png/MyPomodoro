@@ -1825,12 +1825,25 @@ function flashBody() {
 }
 
 function notifyUser(msg) {
-  if (Notification && Notification.permission === 'granted') {
-    new Notification('Pomodoro', {
-      body: msg,
-      icon: 'icons/icon-192.svg',
-      silent: true,
-    });
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const opts = {
+    body: msg,
+    icon:  'icons/icon-192.svg',
+    badge: 'icons/icon-192.svg',
+    tag:      'pomodoro-alert', // neues ersetzt altes (kein Stapeln)
+    renotify: true,             // trotz tag erneut Ton/Vibration auslösen
+    requireInteraction: true,   // bleibt sichtbar bis zum Antippen (Android)
+    vibrate: [200, 100, 200, 100, 300],
+  };
+  /* Service-Worker-Notification: funktioniert auch wenn die App im
+     Hintergrund läuft (Mobile, Tab nicht aktiv). Fallback auf klassische
+     Notification wenn kein SW-Controller vorhanden. */
+  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.ready
+      .then(reg => reg.showNotification('MyPomodoro', opts))
+      .catch(() => new Notification('MyPomodoro', opts));
+  } else {
+    new Notification('MyPomodoro', opts);
   }
 }
 
@@ -2146,6 +2159,7 @@ function stTick() {
     updateScreenTimeUI();
     playBreakEnd();
     vibrate([200, 100, 200]);
+    notifyUser('Bildschirmzeit abgelaufen — Zeit für etwas anderes! 📵');
     showToast('Bildschirmzeit aufgebraucht!');
   }
 }
@@ -2158,6 +2172,10 @@ function startScreenTime(sessionSecs) {
     showToast('Fokus- oder Pausen-Timer läuft — bitte zuerst stoppen');
     vibrate(40);
     return;
+  }
+
+  if (Notification && Notification.permission === 'default') {
+    Notification.requestPermission();
   }
 
   screenTimeRunning = true;
