@@ -1935,7 +1935,6 @@ function tick() {
     const msg = isLong
       ? `Langer Zyklus! +${earnedLabel} — stoppe wenn du Pause machen willst`
       : `25 Min geschafft! +${earnedLabel} — stoppe wenn du Pause machen willst`;
-    playDone();
     vibrate([200, 100, 200, 100, 400]);
     flashBody();
     notifyUser(msg);
