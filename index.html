@@ -1758,6 +1758,29 @@ function playDone() {
   } catch(_) {}
 }
 
+/* Soft bell-chime played when a break (Pause or Bildschirmzeit) ends.
+   Three harmonic sine notes (C5→E5→G5) with a long resonant decay —
+   clearly audible, but gentle and not startling. */
+function playBreakEnd() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [523, 659, 784].forEach((freq, i) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      const t0 = ctx.currentTime + i * 0.32;
+      gain.gain.setValueAtTime(0, t0);
+      gain.gain.linearRampToValueAtTime(0.32, t0 + 0.02);   // fast attack → bell
+      gain.gain.exponentialRampToValueAtTime(0.001, t0 + 1.3); // long warm decay
+      osc.start(t0);
+      osc.stop(t0 + 1.35);
+    });
+  } catch(_) {}
+}
+
 function vibrate(pattern) {
   if ('vibrate' in navigator) navigator.vibrate(pattern);
 }
@@ -1853,7 +1876,7 @@ function switchMode(key) {
 function onPauseComplete() {
   /* Break bank fully used up */
   breakBank = 0;
-  playDone();
+  playBreakEnd();
   vibrate([300, 100, 300]);
   flashBody();
   notifyUser('Pause vorbei — bereit für den nächsten Fokus-Block?');
@@ -2045,7 +2068,7 @@ function stTick() {
     screenTimeRunning = false; screenTimeEpoch = null;
     screenTimeBanner.classList.remove('active');
     updateScreenTimeUI();
-    playDone();
+    playBreakEnd();
     vibrate([200, 100, 200]);
     showToast('Bildschirmzeit aufgebraucht!');
   }
