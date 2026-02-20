@@ -846,6 +846,138 @@
       transition: background 0.2s;
     }
     .stb-end:active { background: rgba(167,139,250,0.25); }
+
+    /* ── Secret-code reward ── */
+    .reward-icon--code {
+      background: rgba(251,191,36,0.10);
+      border-color: rgba(251,191,36,0.22);
+      color: #fbbf24;
+    }
+
+    /* State rows — only one shown at a time */
+    .code-state { display: none; font-size: 0.78rem; }
+    .code-card--empty    .code-state--empty    { display: block; color: rgba(255,255,255,0.32); }
+    .code-card--locked   .code-state--locked   { display: block; }
+    .code-card--revealed .code-state--revealed { display: block; }
+
+    .code-dots {
+      font-size: 0.58rem;
+      color: rgba(255,255,255,0.28);
+      letter-spacing: 0.32em;
+    }
+    .code-text {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.82rem;
+      color: #fcd34d;
+      letter-spacing: 0.10em;
+      word-break: break-all;
+    }
+
+    /* Right-side elements hidden by default */
+    .code-cost,
+    .btn-set-code,
+    #btnRevealCode,
+    .btn-hide-code,
+    .btn-change-code { display: none; }
+
+    .code-card--empty    .btn-set-code  { display: block; }
+    .code-card--locked   .code-cost     { display: flex;  }
+    .code-card--locked   #btnRevealCode { display: block; }
+    .code-card--revealed .btn-hide-code   { display: block; }
+    .code-card--revealed .btn-change-code { display: block; }
+
+    .code-cost {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: rgba(255,255,255,0.55);
+      align-items: center;
+      gap: 4px;
+    }
+    .code-cost span { color: var(--accent); font-size: 0.80rem; }
+
+    .btn-set-code {
+      padding: 7px 13px;
+      border-radius: 100px;
+      border: 1px solid rgba(251,191,36,0.32);
+      background: rgba(251,191,36,0.10);
+      color: #fbbf24;
+      font-family: inherit;
+      font-size: 0.74rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.2s, transform 0.15s;
+    }
+    .btn-set-code:active { transform: scale(0.92); }
+
+    .btn-hide-code {
+      padding: 7px 13px;
+      border-radius: 100px;
+      border: 1px solid rgba(255,255,255,0.11);
+      background: rgba(255,255,255,0.05);
+      color: rgba(255,255,255,0.42);
+      font-family: inherit;
+      font-size: 0.74rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.2s, transform 0.15s;
+    }
+    .btn-hide-code:active { transform: scale(0.92); }
+
+    .btn-change-code {
+      padding: 4px 10px;
+      border-radius: 100px;
+      border: 1px solid rgba(251,191,36,0.20);
+      background: transparent;
+      color: rgba(251,191,36,0.52);
+      font-family: inherit;
+      font-size: 0.68rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-change-code:active { opacity: 0.60; }
+
+    /* Code input field inside confirm-box */
+    .code-input-field {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.06);
+      color: rgba(255,255,255,0.90);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.90rem;
+      letter-spacing: 0.06em;
+      outline: none;
+      box-sizing: border-box;
+      transition: border-color 0.2s;
+      margin-top: 4px;
+    }
+    .code-input-field:focus  { border-color: rgba(251,191,36,0.45); }
+    .code-input-field::placeholder {
+      color: rgba(255,255,255,0.20);
+      letter-spacing: normal;
+      font-family: inherit;
+    }
+    .btn-confirm-code {
+      flex: 1;
+      padding: 11px;
+      border-radius: 12px;
+      border: none;
+      background: #fbbf24;
+      color: #1c1000;
+      font-family: inherit;
+      font-size: 0.84rem;
+      font-weight: 700;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-confirm-code:active { opacity: 0.85; }
   </style>
 </head>
 <body>
@@ -886,6 +1018,27 @@
     <div class="confirm-actions">
       <button class="btn-cancel-st" id="btnSTCancel">Abbrechen</button>
       <button class="btn-start-st"  id="btnSTStart">Starten</button>
+    </div>
+  </div>
+</div>
+
+<!-- Code input overlay -->
+<div class="confirm-overlay" id="codeInputOverlay">
+  <div class="confirm-box">
+    <div class="confirm-icon" style="color:#fbbf24">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+        <rect x="3" y="11" width="18" height="11" rx="2"/>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+    </div>
+    <div class="confirm-title" id="codeInputTitle">Geheimen Code festlegen</div>
+    <div class="confirm-sub">Wird gesperrt — kostet 2 ✦ zum Enthüllen</div>
+    <input type="text" id="codeInputField" class="code-input-field"
+           placeholder="Dein Code…" autocomplete="off" spellcheck="false" />
+    <div class="confirm-actions">
+      <button class="btn-cancel-st"    id="btnCodeCancel">Abbrechen</button>
+      <button class="btn-confirm-code" id="btnCodeSave">Speichern</button>
     </div>
   </div>
 </div>
@@ -1045,6 +1198,37 @@
           <div class="reward-cost"><span>✦</span> 2</div>
           <button class="btn-buy" id="btnBuyScreenTime">Kaufen</button>
           <button class="btn-use-st" id="btnUseScreenTime">Nutzen</button>
+        </div>
+      </div>
+
+      <!-- Reward: geheimer Code -->
+      <div class="reward-card code-card code-card--empty" id="codeCard">
+        <!-- Padlock icon in gold circle -->
+        <div class="reward-icon-circle reward-icon--code">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <rect x="3" y="11" width="18" height="11" rx="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+        </div>
+
+        <div class="reward-info">
+          <div class="reward-name">Geheimer Code</div>
+          <div class="code-state code-state--empty">Noch kein Code hinterlegt</div>
+          <div class="code-state code-state--locked">
+            <span class="code-dots">● ● ● ● ● ●</span>
+          </div>
+          <div class="code-state code-state--revealed">
+            <span class="code-text" id="codeRevealText"></span>
+          </div>
+        </div>
+
+        <div class="reward-right">
+          <div class="code-cost"><span>✦</span> 2</div>
+          <button class="btn-set-code"   id="btnSetCode">Festlegen</button>
+          <button class="btn-buy"        id="btnRevealCode">Enthüllen</button>
+          <button class="btn-hide-code"  id="btnHideCode">Verstecken</button>
+          <button class="btn-change-code" id="btnChangeCode">Ändern</button>
         </div>
       </div>
 
@@ -1256,6 +1440,9 @@ let screenTimeEpoch   = null;  // Date.now() when screen-time session started
 let screenTimeInit    = 0;     // screenTimeBank value at start of session
 let screenTimeTimerId = null;
 
+let secretCode   = localStorage.getItem('pomodoroSecretCode') || '';
+let codeRevealed = false;  // always starts hidden on fresh page load
+
 /* ═══════════════════════════════════════════════════════════════
    DOM
 ═══════════════════════════════════════════════════════════════ */
@@ -1290,6 +1477,17 @@ const btnSTStart        = document.getElementById('btnSTStart');
 const screenTimeBanner  = document.getElementById('screenTimeBanner');
 const stbTime           = document.getElementById('stbTime');
 const btnEndST          = document.getElementById('btnEndST');
+const codeCard          = document.getElementById('codeCard');
+const codeRevealText    = document.getElementById('codeRevealText');
+const btnSetCode        = document.getElementById('btnSetCode');
+const btnRevealCode     = document.getElementById('btnRevealCode');
+const btnHideCode       = document.getElementById('btnHideCode');
+const btnChangeCode     = document.getElementById('btnChangeCode');
+const codeInputOverlay  = document.getElementById('codeInputOverlay');
+const codeInputField    = document.getElementById('codeInputField');
+const codeInputTitle    = document.getElementById('codeInputTitle');
+const btnCodeCancel     = document.getElementById('btnCodeCancel');
+const btnCodeSave       = document.getElementById('btnCodeSave');
 const g0  = document.getElementById('g0');
 const g1  = document.getElementById('g1');
 const g2  = document.getElementById('g2');
@@ -1487,12 +1685,26 @@ function updateCoinDisplay() {
   btnRewards.classList.toggle('has-coins', coins > 0);
   btnBuy30min.classList.toggle('can-afford', coins >= 3);
   btnBuyScreenTime.classList.toggle('can-afford', coins >= 2);
+  if (secretCode && !codeRevealed) btnRevealCode.classList.toggle('can-afford', coins >= 2);
 }
 
 function updateScreenTimeUI() {
   const has = screenTimeBank > 0;
   screenTimeCard.classList.toggle('has-bank', has);
   if (has) stBankDisplay.textContent = fmt(screenTimeBank);
+}
+
+function updateCodeCardUI() {
+  codeCard.classList.remove('code-card--empty', 'code-card--locked', 'code-card--revealed');
+  if (!secretCode) {
+    codeCard.classList.add('code-card--empty');
+  } else if (codeRevealed) {
+    codeCard.classList.add('code-card--revealed');
+    codeRevealText.textContent = secretCode;
+  } else {
+    codeCard.classList.add('code-card--locked');
+  }
+  btnRevealCode.classList.toggle('can-afford', coins >= 2);
 }
 
 /* Updates tab highlight + viewMode without touching the timer */
@@ -1789,6 +2001,60 @@ btnSTStart.addEventListener('click', () => {
 
 btnEndST.addEventListener('click', endScreenTimeEarly);
 
+/* ── Secret-code reward ── */
+function openCodeInput(prefill = '') {
+  codeInputField.value = prefill;
+  codeInputTitle.textContent = prefill ? 'Code ändern' : 'Geheimen Code festlegen';
+  codeInputOverlay.classList.add('open');
+  /* slight delay so keyboard doesn't flash on overlay enter */
+  setTimeout(() => codeInputField.focus(), 120);
+}
+
+btnSetCode.addEventListener('click', () => openCodeInput());
+
+btnChangeCode.addEventListener('click', () => openCodeInput(secretCode));
+
+btnCodeCancel.addEventListener('click', () => {
+  codeInputOverlay.classList.remove('open');
+});
+
+btnCodeSave.addEventListener('click', saveCode);
+codeInputField.addEventListener('keydown', e => { if (e.key === 'Enter') saveCode(); });
+
+function saveCode() {
+  const val = codeInputField.value.trim();
+  if (!val) {
+    codeInputField.focus();
+    return;
+  }
+  secretCode   = val;
+  codeRevealed = false;
+  localStorage.setItem('pomodoroSecretCode', secretCode);
+  codeInputOverlay.classList.remove('open');
+  updateCodeCardUI();
+  showToast('Code gespeichert und gesperrt 🔒');
+  vibrate([60, 30, 60]);
+}
+
+btnRevealCode.addEventListener('click', () => {
+  if (coins < 2) {
+    showToast('Nicht genug Münzen — du brauchst 2 ✦');
+    vibrate(40);
+    return;
+  }
+  coins -= 2;
+  codeRevealed = true;
+  updateCoinDisplay();
+  updateCodeCardUI();
+  showToast('Code enthüllt!');
+  vibrate(80);
+});
+
+btnHideCode.addEventListener('click', () => {
+  codeRevealed = false;
+  updateCodeCardUI();
+});
+
 document.addEventListener('keydown', e => {
   if (e.code === 'Space') { e.preventDefault(); toggleTimer(); }
   if (e.code === 'KeyR')  resetTimer();
@@ -1846,6 +2112,7 @@ applyTheme('work');
 refresh();
 updateCoinDisplay();
 updateScreenTimeUI();
+updateCodeCardUI();
 </script>
 </body>
 </html>
