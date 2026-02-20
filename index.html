@@ -1734,6 +1734,10 @@ function updateBankDisplay() {
   /* Bank row below timer */
   bankTime.textContent = fmt(breakBank);
   bankRow.classList.toggle('has-time', hasMoney);
+
+  /* Reset button is hidden during a pause session — pause time should
+     only be deducted by actually using it, not via an accidental reset. */
+  btnReset.style.visibility = mode === 'pause' ? 'hidden' : '';
 }
 
 function updateLabel() {
@@ -1951,16 +1955,23 @@ function tick() {
   timeLeft = startLeft - elapsed;
 
   if (mode === 'pause') {
-    breakBank = breakBankReserved + Math.max(0, timeLeft);
-    refresh();
     if (timeLeft <= 0) {
+      /* Clamp to zero so the display always shows 00:00, never +00:01.
+         setInterval can fire a tick late (especially on mobile), causing
+         timeLeft to jump straight to -1 and fmtDisplay to show "+00:01". */
+      timeLeft  = 0;
+      breakBank = breakBankReserved;
       clearInterval(timerId); timerId = null; running = false;
       startEpoch = null; startLeft = null;
       btnMain.classList.remove('running');
       icoPlay.style.display  = '';
       icoPause.style.display = 'none';
+      refresh();
       onPauseComplete();
+      return;
     }
+    breakBank = breakBankReserved + timeLeft;
+    refresh();
     return;
   }
 
@@ -1994,7 +2005,7 @@ function tick() {
 }
 
 function startTimer() {
-  if (mode === 'pause' && breakBank <= 0) return;
+  if (mode === 'pause' && (breakBank <= 0 || timeLeft <= 0)) return;
 
   if (Notification && Notification.permission === 'default') {
     Notification.requestPermission();
