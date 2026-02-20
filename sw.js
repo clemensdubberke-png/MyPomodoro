@@ -18,14 +18,23 @@ self.addEventListener('install', e => {
   );
 });
 
-/* Activate: remove old caches */
+/* Activate: remove old caches, then reload clients if this is an update */
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(
-        keys.filter(k => k !== CACHE).map(k => caches.delete(k))
-      ))
-      .then(() => self.clients.claim())
+      .then(keys => {
+        const stale = keys.filter(k => k !== CACHE);
+        const isUpdate = stale.length > 0;
+        return Promise.all(stale.map(k => caches.delete(k)))
+          .then(() => self.clients.claim())
+          .then(() => {
+            /* Only reload when there actually was an old cache (= real update).
+               This avoids an unwanted reload on the very first install. */
+            if (!isUpdate) return;
+            return self.clients.matchAll({ type: 'window', includeUncontrolled: false })
+              .then(clients => clients.forEach(c => c.navigate(c.url)));
+          });
+      })
   );
 });
 
