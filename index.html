@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pomodoro Timer</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Space+Mono:wght@700&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --accent:      #ff6b35;
+      --accent-mid:  #ff9f5e;
+      --accent-soft: #ffbe76;
+      --glow:        rgba(255, 107, 53, 0.40);
+      --bg-deep:     #0a0a18;
+    }
+
+    body {
+      font-family: 'Outfit', 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(ellipse at 50% -10%, #1e1050 0%, #0c0c20 55%, #000010 100%);
+      color: #f0f0f8;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* ── Stars ── */
+    #stars { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+    .star {
+      position: absolute;
+      border-radius: 50%;
+      background: #fff;
+      animation: twinkle var(--d, 3s) var(--delay, 0s) ease-in-out infinite alternate;
+    }
+    @keyframes twinkle {
+      from { opacity: 0.05; transform: scale(0.7); }
+      to   { opacity: var(--op, 0.55); transform: scale(1.3); }
+    }
+
+    /* ── Layout ── */
+    .app {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 30px;
+    }
+
+    /* ── Title ── */
+    .title {
+      font-size: 1rem;
+      font-weight: 300;
+      letter-spacing: 0.55em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.45);
+    }
+
+    /* ── Mode tabs ── */
+    .tabs {
+      display: flex;
+      gap: 3px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 100px;
+      padding: 4px;
+    }
+    .tab {
+      padding: 7px 20px;
+      border: none;
+      border-radius: 100px;
+      background: transparent;
+      color: rgba(255,255,255,0.45);
+      font-family: inherit;
+      font-size: 0.80rem;
+      font-weight: 400;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      white-space: nowrap;
+    }
+    .tab.active {
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+      box-shadow: 0 2px 14px var(--glow);
+    }
+
+    /* ── Timer area ── */
+    .timer-wrap {
+      position: relative;
+      width: 310px;
+      height: 310px;
+    }
+    .timer-svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg); /* arc starts at 12 o'clock */
+    }
+
+    /* ── Center display (overlays SVG) ── */
+    .timer-center {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      pointer-events: none;
+    }
+    .time-text {
+      font-family: 'Space Mono', 'Courier New', monospace;
+      font-size: 3.9rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: #fff;
+      text-shadow: 0 0 24px var(--glow), 0 0 48px var(--glow);
+      line-height: 1;
+      transition: text-shadow 0.5s;
+    }
+    .mode-text {
+      font-size: 0.72rem;
+      font-weight: 400;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.45);
+    }
+    .dots {
+      display: flex;
+      gap: 7px;
+      margin-top: 4px;
+    }
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.13);
+      transition: background 0.4s, box-shadow 0.4s;
+    }
+    .dot.done {
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--glow), 0 0 18px var(--glow);
+    }
+
+    /* ── Controls ── */
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+    .btn-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(255,255,255,0.04);
+      color: rgba(255,255,255,0.55);
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.25s ease;
+      backdrop-filter: blur(8px);
+    }
+    .btn-icon:hover {
+      border-color: rgba(255,255,255,0.25);
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      transform: scale(1.06);
+    }
+    .btn-main {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      font-size: 1.5rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.2s ease, box-shadow 0.3s ease;
+      box-shadow: 0 6px 26px var(--glow);
+    }
+    .btn-main:hover  { transform: scale(1.09); box-shadow: 0 10px 34px var(--glow); }
+    .btn-main:active { transform: scale(0.94); }
+
+    @keyframes pulse-glow {
+      0%,100% { box-shadow: 0 6px 26px var(--glow); }
+      50%      { box-shadow: 0 6px 42px var(--glow), 0 0 70px var(--glow); }
+    }
+    .btn-main.running { animation: pulse-glow 2s ease-in-out infinite; }
+
+    /* ── Session label ── */
+    .session-label {
+      font-size: 0.74rem;
+      color: rgba(255,255,255,0.32);
+      letter-spacing: 0.08em;
+    }
+  </style>
+</head>
+<body>
+
+<div id="stars"></div>
+
+<div class="app">
+  <div class="title">Pomodoro</div>
+
+  <!-- Mode selector -->
+  <div class="tabs">
+    <button class="tab active" data-mode="work">Fokus</button>
+    <button class="tab" data-mode="short">Kurze Pause</button>
+    <button class="tab" data-mode="long">Lange Pause</button>
+  </div>
+
+  <!-- SVG Timer + overlay -->
+  <div class="timer-wrap">
+    <svg class="timer-svg" viewBox="0 0 310 310" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <!-- Glow filter for the progress arc -->
+        <filter id="arcGlow" x="-25%" y="-25%" width="150%" height="150%">
+          <feGaussianBlur stdDeviation="4.5" result="blur"/>
+          <feMerge>
+            <feMergeNode in="blur"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+
+        <!-- Gradient that follows the arc colour theme -->
+        <linearGradient id="arcGrad"
+          x1="310" y1="0" x2="0" y2="310"
+          gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   id="g0"/>
+          <stop offset="50%"  id="g1"/>
+          <stop offset="100%" id="g2"/>
+        </linearGradient>
+
+        <!-- Soft radial fill inside the inner ring -->
+        <radialGradient id="innerFill" cx="50%" cy="50%" r="50%">
+          <stop offset="0%"   id="ig0" stop-opacity="0.08"/>
+          <stop offset="100%" id="ig1" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+
+      <!-- Outer decorative dashed ring -->
+      <circle cx="155" cy="155" r="150"
+        fill="none"
+        stroke="rgba(255,255,255,0.05)"
+        stroke-width="1"
+        stroke-dasharray="4 10"/>
+
+      <!-- Tick marks (generated by JS) -->
+      <g id="ticks" opacity="0.22"></g>
+
+      <!-- Track ring -->
+      <circle cx="155" cy="155" r="122"
+        fill="none"
+        stroke="rgba(255,255,255,0.07)"
+        stroke-width="11"
+        stroke-linecap="round"/>
+
+      <!-- Inner radial glow -->
+      <circle cx="155" cy="155" r="111" fill="url(#innerFill)"/>
+
+      <!-- Progress arc  ← this is the main graphic element -->
+      <circle id="arc"
+        cx="155" cy="155" r="122"
+        fill="none"
+        stroke="url(#arcGrad)"
+        stroke-width="11"
+        stroke-linecap="round"
+        filter="url(#arcGlow)"/>
+    </svg>
+
+    <!-- Centered text overlay -->
+    <div class="timer-center">
+      <div class="time-text"  id="timeText">25:00</div>
+      <div class="mode-text"  id="modeText">Fokus</div>
+      <div class="dots">
+        <div class="dot" id="d1"></div>
+        <div class="dot" id="d2"></div>
+        <div class="dot" id="d3"></div>
+        <div class="dot" id="d4"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Playback controls -->
+  <div class="controls">
+    <!-- Reset -->
+    <button class="btn-icon" id="btnReset" title="Zurücksetzen (R)">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.5"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M1 4v6h6"/>
+        <path d="M23 20v-6h-6"/>
+        <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15"/>
+      </svg>
+    </button>
+
+    <!-- Play / Pause -->
+    <button class="btn-main" id="btnMain" title="Start / Pause (Leertaste)">
+      <svg id="icoPlay" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+        <polygon points="6,3 20,12 6,21"/>
+      </svg>
+      <svg id="icoPause" width="22" height="22" viewBox="0 0 24 24"
+           fill="currentColor" style="display:none">
+        <rect x="5"  y="4" width="4" height="16" rx="1"/>
+        <rect x="15" y="4" width="4" height="16" rx="1"/>
+      </svg>
+    </button>
+
+    <!-- Skip -->
+    <button class="btn-icon" id="btnSkip" title="Überspringen">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.5"
+           stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="5,4 15,12 5,20"/>
+        <line x1="19" y1="4" x2="19" y2="20"/>
+      </svg>
+    </button>
+  </div>
+
+  <div class="session-label" id="sessionLabel">Sitzung 1 von 4</div>
+</div>
+
+<script>
+/* ── Config ───────────────────────────────────────────────────── */
+const CFG = {
+  work:  { sec: 25*60, label: 'Fokus',       c0:'#ffbe76', c1:'#ff6b35', c2:'#e84118', glow:'rgba(255,107,53,0.40)',   ig:'#ff6b35' },
+  short: { sec:  5*60, label: 'Kurze Pause', c0:'#55efc4', c1:'#1dd1a1', c2:'#00b894', glow:'rgba(29,209,161,0.38)',   ig:'#1dd1a1' },
+  long:  { sec: 15*60, label: 'Lange Pause', c0:'#a4c8ff', c1:'#54a0ff', c2:'#2e86de', glow:'rgba(84,160,255,0.38)',   ig:'#54a0ff' },
+};
+
+const R    = 122;
+const CIRC = 2 * Math.PI * R; // ≈ 766.95
+
+/* ── State ────────────────────────────────────────────────────── */
+let mode        = 'work';
+let timeLeft    = CFG.work.sec;
+let running     = false;
+let timerId     = null;
+let doneInCycle = 0;          // 0-3 completed work sessions in cycle
+
+/* ── DOM ──────────────────────────────────────────────────────── */
+const arc          = document.getElementById('arc');
+const timeText     = document.getElementById('timeText');
+const modeText     = document.getElementById('modeText');
+const btnMain      = document.getElementById('btnMain');
+const icoPlay      = document.getElementById('icoPlay');
+const icoPause     = document.getElementById('icoPause');
+const btnReset     = document.getElementById('btnReset');
+const btnSkip      = document.getElementById('btnSkip');
+const sessionLabel = document.getElementById('sessionLabel');
+const dots         = [1,2,3,4].map(i => document.getElementById('d'+i));
+const g0 = document.getElementById('g0');
+const g1 = document.getElementById('g1');
+const g2 = document.getElementById('g2');
+const ig0 = document.getElementById('ig0');
+const ig1 = document.getElementById('ig1');
+
+/* ── Init arc ─────────────────────────────────────────────────── */
+arc.style.strokeDasharray  = CIRC;
+arc.style.strokeDashoffset = 0;
+
+/* ── Stars ────────────────────────────────────────────────────── */
+const starsEl = document.getElementById('stars');
+for (let i = 0; i < 90; i++) {
+  const s = document.createElement('div');
+  s.className = 'star';
+  const sz = (Math.random() * 1.8 + 0.4).toFixed(1);
+  s.style.cssText = [
+    `width:${sz}px`, `height:${sz}px`,
+    `top:${(Math.random()*100).toFixed(2)}%`,
+    `left:${(Math.random()*100).toFixed(2)}%`,
+    `--d:${(Math.random()*5+1.5).toFixed(1)}s`,
+    `--delay:${(Math.random()*5).toFixed(1)}s`,
+    `--op:${(Math.random()*0.55+0.15).toFixed(2)}`
+  ].join(';');
+  starsEl.appendChild(s);
+}
+
+/* ── Tick marks ───────────────────────────────────────────────── */
+const tickGroup = document.getElementById('ticks');
+const TICKS = 60;
+for (let i = 0; i < TICKS; i++) {
+  const angle   = (i / TICKS) * 2 * Math.PI - Math.PI / 2;
+  const isMajor = i % 5 === 0;
+  const rInner  = isMajor ? 134 : 137;
+  const rOuter  = 144;
+  const ln = document.createElementNS('http://www.w3.org/2000/svg','line');
+  ln.setAttribute('x1', (155 + rInner * Math.cos(angle)).toFixed(2));
+  ln.setAttribute('y1', (155 + rInner * Math.sin(angle)).toFixed(2));
+  ln.setAttribute('x2', (155 + rOuter * Math.cos(angle)).toFixed(2));
+  ln.setAttribute('y2', (155 + rOuter * Math.sin(angle)).toFixed(2));
+  ln.setAttribute('stroke', 'white');
+  ln.setAttribute('stroke-width', isMajor ? '2' : '1');
+  ln.setAttribute('stroke-linecap', 'round');
+  tickGroup.appendChild(ln);
+}
+
+/* ── Helpers ──────────────────────────────────────────────────── */
+function fmt(s) {
+  return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+}
+
+function setCSSVar(name, val) {
+  document.documentElement.style.setProperty(name, val);
+}
+
+function applyTheme(key) {
+  const c = CFG[key];
+  setCSSVar('--accent',      c.c1);
+  setCSSVar('--accent-mid',  c.c2);
+  setCSSVar('--accent-soft', c.c0);
+  setCSSVar('--glow',        c.glow);
+  g0.setAttribute('stop-color', c.c0);
+  g1.setAttribute('stop-color', c.c1);
+  g2.setAttribute('stop-color', c.c2);
+  ig0.setAttribute('stop-color', c.ig);
+  ig1.setAttribute('stop-color', c.ig);
+}
+
+function updateArc() {
+  const frac = timeLeft / CFG[mode].sec;
+  arc.style.strokeDashoffset = (CIRC * (1 - frac)).toFixed(3);
+}
+
+function updateDots() {
+  dots.forEach((d, i) => d.classList.toggle('done', i < doneInCycle));
+}
+
+function updateLabel() {
+  if (mode === 'work') {
+    sessionLabel.textContent = `Sitzung ${doneInCycle + 1} von 4`;
+  } else if (mode === 'short') {
+    sessionLabel.textContent = `Kurze Pause · noch ${4 - doneInCycle} Sitzung(en)`;
+  } else {
+    sessionLabel.textContent = 'Lange Pause · neuer Zyklus';
+  }
+}
+
+function refresh() {
+  timeText.textContent = fmt(timeLeft);
+  updateArc();
+  updateDots();
+  updateLabel();
+}
+
+/* ── Mode switch ──────────────────────────────────────────────── */
+function switchMode(key, resetDots) {
+  stopTimer();
+  mode     = key;
+  timeLeft = CFG[key].sec;
+  if (resetDots) doneInCycle = 0;
+  applyTheme(key);
+  modeText.textContent = CFG[key].label;
+  document.querySelectorAll('.tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.mode === key)
+  );
+  refresh();
+}
+
+/* ── Sound ────────────────────────────────────────────────────── */
+function playDone() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [523, 659, 784, 1047].forEach((freq, i) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      const t0 = ctx.currentTime + i * 0.16;
+      gain.gain.setValueAtTime(0, t0);
+      gain.gain.linearRampToValueAtTime(0.22, t0 + 0.06);
+      gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.42);
+      osc.start(t0);
+      osc.stop(t0 + 0.45);
+    });
+  } catch(_) {}
+}
+
+/* ── Timer complete ───────────────────────────────────────────── */
+function onComplete() {
+  playDone();
+  if (mode === 'work') {
+    doneInCycle++;
+    if (doneInCycle >= 4) {
+      switchMode('long', false);
+    } else {
+      switchMode('short', false);
+    }
+  } else {
+    const resetDots = mode === 'long';
+    switchMode('work', resetDots);
+  }
+}
+
+/* ── Timer control ────────────────────────────────────────────── */
+function stopTimer() {
+  if (timerId) { clearInterval(timerId); timerId = null; }
+  running = false;
+  btnMain.classList.remove('running');
+  icoPlay.style.display  = '';
+  icoPause.style.display = 'none';
+}
+
+function startTimer() {
+  running = true;
+  btnMain.classList.add('running');
+  icoPlay.style.display  = 'none';
+  icoPause.style.display = '';
+  timerId = setInterval(() => {
+    timeLeft--;
+    refresh();
+    if (timeLeft <= 0) { stopTimer(); onComplete(); }
+  }, 1000);
+}
+
+function toggleTimer() { running ? stopTimer() : startTimer(); }
+
+function resetTimer() {
+  stopTimer();
+  timeLeft = CFG[mode].sec;
+  refresh();
+}
+
+function skipTimer() {
+  stopTimer();
+  timeLeft = 0;
+  refresh();
+  setTimeout(onComplete, 80);
+}
+
+/* ── Events ───────────────────────────────────────────────────── */
+btnMain.addEventListener('click',  toggleTimer);
+btnReset.addEventListener('click', resetTimer);
+btnSkip.addEventListener('click',  skipTimer);
+
+document.querySelectorAll('.tab').forEach(tab =>
+  tab.addEventListener('click', () => switchMode(tab.dataset.mode, false))
+);
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space') { e.preventDefault(); toggleTimer(); }
+  if (e.code === 'KeyR')  resetTimer();
+});
+
+/* ── Boot ─────────────────────────────────────────────────────── */
+applyTheme('work');
+refresh();
+</script>
+</body>
+</html>
