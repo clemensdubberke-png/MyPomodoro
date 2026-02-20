@@ -1536,6 +1536,32 @@ let secretCode   = localStorage.getItem('pomodoroSecretCode') || '';
 let codeRevealed = false;  // always starts hidden on fresh page load
 
 /* ═══════════════════════════════════════════════════════════════
+   PERSISTENCE
+═══════════════════════════════════════════════════════════════ */
+const STATE_KEY = 'pomodoroAppState';
+
+function saveState() {
+  try {
+    localStorage.setItem(STATE_KEY, JSON.stringify({
+      coins, breakBank, extraBreakBank, screenTimeBank, doneInCycle,
+    }));
+  } catch(_) {}
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STATE_KEY);
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    if (typeof s.coins          === 'number') coins          = s.coins;
+    if (typeof s.breakBank      === 'number') breakBank      = s.breakBank;
+    if (typeof s.extraBreakBank === 'number') extraBreakBank = s.extraBreakBank;
+    if (typeof s.screenTimeBank === 'number') screenTimeBank = s.screenTimeBank;
+    if (typeof s.doneInCycle    === 'number') doneInCycle    = s.doneInCycle;
+  } catch(_) {}
+}
+
+/* ═══════════════════════════════════════════════════════════════
    DOM
 ═══════════════════════════════════════════════════════════════ */
 const arc          = document.getElementById('arc');
@@ -1809,6 +1835,7 @@ function updateCoinDisplay() {
   btnBuy30min.classList.toggle('can-afford', coins >= 3);
   btnBuyScreenTime.classList.toggle('can-afford', coins >= 2);
   if (secretCode && !codeRevealed) btnRevealCode.classList.toggle('can-afford', coins >= 2);
+  saveState();
 }
 
 function updateScreenTimeUI() {
@@ -1876,6 +1903,7 @@ function switchMode(key) {
 function onPauseComplete() {
   /* Break bank fully used up */
   breakBank = 0;
+  saveState();
   playBreakEnd();
   vibrate([300, 100, 300]);
   flashBody();
@@ -1931,6 +1959,7 @@ function tick() {
     breakBank += earned;
     if (isLong) { coins++; updateCoinDisplay(); }
     if (doneInCycle >= 4) doneInCycle = 0;
+    saveState();
     const earnedLabel = isLong ? '15 Min' : '5 Min';
     const msg = isLong
       ? `Langer Zyklus! +${earnedLabel} — stoppe wenn du Pause machen willst`
@@ -2174,6 +2203,7 @@ btnSliderStart.addEventListener('click', () => {
     showToast(`+${fmt(chosen)} Pause hinzugefügt!`);
     vibrate(80);
   }
+  saveState();
 });
 
 btnEndST.addEventListener('click', endScreenTimeEarly);
@@ -2285,6 +2315,7 @@ if ('serviceWorker' in navigator) {
 /* ═══════════════════════════════════════════════════════════════
    BOOT
 ═══════════════════════════════════════════════════════════════ */
+loadState();
 applyTheme('work');
 refresh();
 updateCoinDisplay();
