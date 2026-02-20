@@ -1,24 +1,27 @@
 /* ── Pomodoro Timer – Service Worker ── */
-const CACHE = 'pomodoro-v10';
-const ASSETS = [
-  './',
-  './index.html',
+const CACHE = 'pomodoro-v11';
+
+/* Static assets that rarely change — safe to serve from cache */
+const STATIC_ASSETS = [
   './manifest.json',
   './icons/icon-192.svg',
   './icons/icon-512.svg',
   './icons/icon-maskable.svg',
 ];
 
-/* Install: pre-cache all local assets */
+/* Install: pre-cache only static assets.
+   index.html is intentionally excluded so it is always fetched
+   fresh from the network (network-first below). */
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE)
-      .then(cache => cache.addAll(ASSETS))
+      .then(cache => cache.addAll(STATIC_ASSETS))
       .then(() => self.skipWaiting())
   );
 });
 
-/* Activate: remove old caches, then reload clients if this is an update */
+/* Activate: remove all old caches, claim clients, then reload open tabs
+   so they immediately get the latest code without a manual refresh. */
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
@@ -28,8 +31,6 @@ self.addEventListener('activate', e => {
         return Promise.all(stale.map(k => caches.delete(k)))
           .then(() => self.clients.claim())
           .then(() => {
-            /* Only reload when there actually was an old cache (= real update).
-               This avoids an unwanted reload on the very first install. */
             if (!isUpdate) return;
             return self.clients.matchAll({ type: 'window', includeUncontrolled: false })
               .then(clients => clients.forEach(c => c.navigate(c.url)));
@@ -38,9 +39,26 @@ self.addEventListener('activate', e => {
   );
 });
 
-/* Fetch: cache-first for local, network-first for Google Fonts */
+/* Fetch strategy:
+   - index.html   → network-first (always get latest code; fall back to cache offline)
+   - Google Fonts → network-first, cache for offline fallback
+   - Everything else (icons, manifest) → cache-first                                  */
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
+
+  /* index.html – network first so code updates are always picked up */
+  if (url.pathname.endsWith('/') || url.pathname.endsWith('index.html')) {
+    e.respondWith(
+      fetch(e.request)
+        .then(res => {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+          return res;
+        })
+        .catch(() => caches.match(e.request))
+    );
+    return;
+  }
 
   /* Google Fonts – network first, fallback to cache */
   if (url.hostname.includes('googleapis.com') || url.hostname.includes('gstatic.com')) {
@@ -56,7 +74,7 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  /* Everything else – cache first */
+  /* Static assets – cache first, network fallback */
   e.respondWith(
     caches.match(e.request)
       .then(cached => cached || fetch(e.request)
