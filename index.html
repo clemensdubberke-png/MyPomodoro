@@ -373,12 +373,220 @@
       100% { background-color: transparent; }
     }
     body.flash { animation: flash-bg 0.8s ease-out; }
+
+    /* ── Coin button ── */
+    .coin-btn {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 100px;
+      padding: 7px 16px 7px 8px;
+      cursor: pointer;
+      color: rgba(255,255,255,0.28);
+      font-family: inherit;
+      font-size: clamp(0.72rem, 2.2vw, 0.80rem);
+      letter-spacing: 0.04em;
+      transition: all 0.35s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .coin-btn.has-coins {
+      border-color: rgba(255,200,50,0.25);
+      color: rgba(255,210,80,0.80);
+      background: rgba(255,160,0,0.05);
+    }
+    .coin-btn:active { transform: scale(0.95); }
+
+    /* Circular coin token */
+    .coin-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 38% 32%, #666 0%, #3a3a3a 52%, #222 100%);
+      box-shadow: inset 0 -2px 4px rgba(0,0,0,0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 12px;
+      color: rgba(255,255,255,0.18);
+      transition: background 0.5s, box-shadow 0.5s, color 0.5s;
+      user-select: none;
+    }
+    .coin-btn.has-coins .coin-icon,
+    .coin-icon--active {
+      background: radial-gradient(circle at 38% 32%, #ffe566 0%, #ffaa00 52%, #c06000 100%);
+      box-shadow: inset 0 -2px 4px rgba(0,0,0,0.2),
+                  0 0 14px rgba(255,160,0,0.45),
+                  0 0 0 1.5px rgba(255,200,60,0.4);
+      color: rgba(255,253,215,0.95);
+      animation: coin-shimmer 3s ease-in-out infinite;
+    }
+    .coin-icon--lg {
+      width: 44px;
+      height: 44px;
+      font-size: 18px;
+    }
+    @keyframes coin-shimmer {
+      0%,100% { box-shadow: inset 0 -2px 4px rgba(0,0,0,0.2), 0 0 12px rgba(255,160,0,0.4),  0 0 0 1.5px rgba(255,200,60,0.35); }
+      50%      { box-shadow: inset 0 -2px 4px rgba(0,0,0,0.2), 0 0 24px rgba(255,160,0,0.65), 0 0 0 1.5px rgba(255,200,60,0.6); }
+    }
+    .coin-count  { font-family: 'Space Mono', monospace; font-size: 0.85em; font-weight: 700; }
+    .coin-arrow  { opacity: 0.30; margin-left: 2px; transition: opacity 0.35s; }
+    .coin-btn.has-coins .coin-arrow { opacity: 0.55; }
+
+    /* ── Rewards overlay (bottom sheet) ── */
+    .rewards-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,12,0.72);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      z-index: 200;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .rewards-overlay.open {
+      opacity: 1;
+      pointer-events: all;
+    }
+    .rewards-panel {
+      width: 100%;
+      max-width: 480px;
+      background: linear-gradient(168deg, #131328 0%, #0c0c1e 100%);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-bottom: none;
+      border-radius: 22px 22px 0 0;
+      padding-bottom: calc(var(--sab) + 30px);
+      transform: translateY(100%);
+      transition: transform 0.42s cubic-bezier(0.22,1,0.36,1);
+      max-height: 82vh;
+      overflow-y: auto;
+    }
+    .rewards-overlay.open .rewards-panel { transform: translateY(0); }
+    .rewards-handle {
+      width: 38px; height: 4px;
+      border-radius: 2px;
+      background: rgba(255,255,255,0.12);
+      margin: 13px auto 0;
+    }
+    .rewards-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 20px 12px;
+    }
+    .rewards-title {
+      font-size: clamp(0.72rem, 2.4vw, 0.84rem);
+      font-weight: 600;
+      letter-spacing: 0.55em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.45);
+    }
+    .rewards-close {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.09);
+      background: rgba(255,255,255,0.04);
+      color: rgba(255,255,255,0.45);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.2s;
+    }
+    .rewards-close:active { background: rgba(255,255,255,0.10); }
+    .rewards-balance-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 16px 18px;
+      background: rgba(255,160,0,0.05);
+      border-top: 1px solid rgba(255,200,50,0.10);
+      border-bottom: 1px solid rgba(255,200,50,0.10);
+      margin: 0 16px;
+      border-radius: 14px;
+    }
+    .rewards-balance-label {
+      flex: 1;
+      font-size: clamp(0.70rem, 2vw, 0.78rem);
+      color: rgba(255,210,80,0.60);
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+    .rewards-balance-amount {
+      font-family: 'Space Mono', monospace;
+      font-size: 1.45rem;
+      font-weight: 700;
+      color: #ffe566;
+      text-shadow: 0 0 20px rgba(255,210,50,0.55);
+      letter-spacing: 0.05em;
+    }
+    .rewards-empty {
+      padding: 46px 28px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      text-align: center;
+    }
+    .rewards-empty-icon { color: rgba(255,255,255,0.10); }
+    .rewards-empty-text {
+      font-size: clamp(0.74rem, 2.2vw, 0.82rem);
+      color: rgba(255,255,255,0.25);
+      line-height: 1.75;
+      letter-spacing: 0.03em;
+    }
   </style>
 </head>
 <body>
 
 <div id="stars"></div>
 <div class="earned-toast" id="earnedToast"></div>
+
+<!-- Rewards bottom sheet -->
+<div class="rewards-overlay" id="rewardsOverlay">
+  <div class="rewards-panel">
+    <div class="rewards-handle"></div>
+    <div class="rewards-header">
+      <div class="rewards-title">Belohnungen</div>
+      <button class="rewards-close" id="btnCloseRewards">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <path d="M18 6L6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Coin balance -->
+    <div class="rewards-balance-row">
+      <div class="coin-icon coin-icon--lg coin-icon--active">✦</div>
+      <div class="rewards-balance-label">Fokus-Münzen</div>
+      <div class="rewards-balance-amount" id="rewardsCoinBalance">0</div>
+    </div>
+
+    <!-- Empty state (placeholder for future rewards) -->
+    <div class="rewards-empty">
+      <div class="rewards-empty-icon">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.1"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 12v10H4V12"/>
+          <path d="M22 7H2v5h20V7z"/>
+          <path d="M12 22V7"/>
+          <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/>
+          <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
+        </svg>
+      </div>
+      <p class="rewards-empty-text">Hier erscheinen bald<br>deine Belohnungen.<br><br>
+        Sammle Münzen, indem du<br>4 Fokus-Zyklen abschließt.</p>
+    </div>
+  </div>
+</div>
 
 <div class="app">
   <div class="title">Pomodoro</div>
@@ -505,6 +713,17 @@
     </div>
   </div>
 
+  <!-- Coin / Rewards button -->
+  <button class="coin-btn" id="btnRewards" title="Belohnungen öffnen">
+    <div class="coin-icon">✦</div>
+    <span class="coin-count" id="coinCountDisplay">0</span>
+    <span>Münzen</span>
+    <svg class="coin-arrow" width="13" height="13" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+      <path d="M9 18l6-6-6-6"/>
+    </svg>
+  </button>
+
   <!-- PWA Install Banner -->
   <div id="installBanner">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
@@ -552,6 +771,7 @@ let overtime     = false; // work mode running past the 25-min mark
 let startEpoch   = null;  // Date.now() when timer last started/resumed
 let startLeft    = null;  // timeLeft value when timer last started/resumed
 let viewMode     = 'work'; // which tab the UI is currently showing (can differ from mode)
+let coins        = 0;      // reward currency earned after every 4-session cycle
 
 /* ═══════════════════════════════════════════════════════════════
    DOM
@@ -569,7 +789,12 @@ const bankRow      = document.getElementById('bankRow');
 const bankTime     = document.getElementById('bankTime');
 const tabPause     = document.getElementById('tabPause');
 const earnedToast  = document.getElementById('earnedToast');
-const dots         = [1,2,3,4].map(i => document.getElementById('d'+i));
+const dots             = [1,2,3,4].map(i => document.getElementById('d'+i));
+const btnRewards       = document.getElementById('btnRewards');
+const coinCountDisplay = document.getElementById('coinCountDisplay');
+const rewardsOverlay   = document.getElementById('rewardsOverlay');
+const rewardsCoinBal   = document.getElementById('rewardsCoinBalance');
+const btnCloseRewards  = document.getElementById('btnCloseRewards');
 const g0  = document.getElementById('g0');
 const g1  = document.getElementById('g1');
 const g2  = document.getElementById('g2');
@@ -761,6 +986,12 @@ function notifyUser(msg) {
   }
 }
 
+function updateCoinDisplay() {
+  coinCountDisplay.textContent = coins;
+  rewardsCoinBal.textContent   = coins;
+  btnRewards.classList.toggle('has-coins', coins > 0);
+}
+
 /* Updates tab highlight + viewMode without touching the timer */
 function setViewTab(key) {
   viewMode = key;
@@ -854,6 +1085,7 @@ function tick() {
     const isLong  = doneInCycle % 4 === 0;
     const earned  = isLong ? 15*60 : 5*60;
     breakBank += earned;
+    if (isLong) { coins++; updateCoinDisplay(); }
     if (doneInCycle >= 4) doneInCycle = 0;
     const earnedLabel = isLong ? '15 Min' : '5 Min';
     const msg = isLong
@@ -934,6 +1166,13 @@ document.querySelectorAll('.tab').forEach(tab =>
   })
 );
 
+/* ── Rewards modal ── */
+btnRewards.addEventListener('click', () => rewardsOverlay.classList.add('open'));
+btnCloseRewards.addEventListener('click', () => rewardsOverlay.classList.remove('open'));
+rewardsOverlay.addEventListener('click', e => {
+  if (e.target === rewardsOverlay) rewardsOverlay.classList.remove('open');
+});
+
 document.addEventListener('keydown', e => {
   if (e.code === 'Space') { e.preventDefault(); toggleTimer(); }
   if (e.code === 'KeyR')  resetTimer();
@@ -986,6 +1225,7 @@ if ('serviceWorker' in navigator) {
 ═══════════════════════════════════════════════════════════════ */
 applyTheme('work');
 refresh();
+updateCoinDisplay();
 </script>
 </body>
 </html>
