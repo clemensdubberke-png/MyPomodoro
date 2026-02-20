@@ -2,8 +2,31 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Pomodoro Timer</title>
+
+  <!-- PWA manifest -->
+  <link rel="manifest" href="manifest.json" />
+
+  <!-- Theme & status bar -->
+  <meta name="theme-color" content="#0a0a18" />
+  <meta name="background-color" content="#0a0a18" />
+
+  <!-- Android Chrome -->
+  <meta name="mobile-web-app-capable" content="yes" />
+
+  <!-- iOS Safari -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Pomodoro" />
+  <link rel="apple-touch-icon" href="icons/icon-512.svg" />
+
+  <!-- Microsoft -->
+  <meta name="msapplication-TileColor" content="#0a0a18" />
+
+  <!-- Description -->
+  <meta name="description" content="Ein schöner Pomodoro Timer für fokussiertes Arbeiten" />
+
   <link
     href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Space+Mono:wght@700&display=swap"
     rel="stylesheet"
@@ -17,11 +40,22 @@
       --accent-soft: #ffbe76;
       --glow:        rgba(255, 107, 53, 0.40);
       --bg-deep:     #0a0a18;
+      /* Safe area insets for notched phones */
+      --sat: env(safe-area-inset-top,    0px);
+      --sab: env(safe-area-inset-bottom, 0px);
+      --sal: env(safe-area-inset-left,   0px);
+      --sar: env(safe-area-inset-right,  0px);
+    }
+
+    html {
+      height: -webkit-fill-available;
     }
 
     body {
       font-family: 'Outfit', 'Segoe UI', sans-serif;
       min-height: 100vh;
+      min-height: -webkit-fill-available;
+      min-height: 100dvh;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -30,6 +64,13 @@
       color: #f0f0f8;
       overflow: hidden;
       user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+      /* Safe area padding */
+      padding-top:    var(--sat);
+      padding-bottom: var(--sab);
+      padding-left:   var(--sal);
+      padding-right:  var(--sar);
     }
 
     /* ── Stars ── */
@@ -52,12 +93,15 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 30px;
+      gap: clamp(16px, 3.5vw, 30px);
+      padding: 12px 16px;
+      width: 100%;
+      max-width: 420px;
     }
 
     /* ── Title ── */
     .title {
-      font-size: 1rem;
+      font-size: clamp(0.75rem, 2.5vw, 1rem);
       font-weight: 300;
       letter-spacing: 0.55em;
       text-transform: uppercase;
@@ -72,19 +116,23 @@
       border: 1px solid rgba(255,255,255,0.08);
       border-radius: 100px;
       padding: 4px;
+      width: 100%;
+      max-width: 340px;
     }
     .tab {
-      padding: 7px 20px;
+      flex: 1;
+      padding: 8px 10px;
       border: none;
       border-radius: 100px;
       background: transparent;
       color: rgba(255,255,255,0.45);
       font-family: inherit;
-      font-size: 0.80rem;
+      font-size: clamp(0.68rem, 2.2vw, 0.80rem);
       font-weight: 400;
       cursor: pointer;
       transition: all 0.3s ease;
       white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
     }
     .tab.active {
       background: var(--accent);
@@ -96,16 +144,16 @@
     /* ── Timer area ── */
     .timer-wrap {
       position: relative;
-      width: 310px;
-      height: 310px;
+      width: min(310px, 88vw);
+      height: min(310px, 88vw);
     }
     .timer-svg {
       width: 100%;
       height: 100%;
-      transform: rotate(-90deg); /* arc starts at 12 o'clock */
+      transform: rotate(-90deg);
     }
 
-    /* ── Center display (overlays SVG) ── */
+    /* ── Center display ── */
     .timer-center {
       position: absolute;
       inset: 0;
@@ -118,7 +166,7 @@
     }
     .time-text {
       font-family: 'Space Mono', 'Courier New', monospace;
-      font-size: 3.9rem;
+      font-size: clamp(3rem, 11vw, 3.9rem);
       font-weight: 700;
       letter-spacing: 0.05em;
       color: #fff;
@@ -127,7 +175,7 @@
       transition: text-shadow 0.5s;
     }
     .mode-text {
-      font-size: 0.72rem;
+      font-size: clamp(0.62rem, 2vw, 0.72rem);
       font-weight: 400;
       letter-spacing: 0.3em;
       text-transform: uppercase;
@@ -154,11 +202,11 @@
     .controls {
       display: flex;
       align-items: center;
-      gap: 18px;
+      gap: clamp(12px, 4vw, 18px);
     }
     .btn-icon {
-      width: 48px;
-      height: 48px;
+      width: 52px;
+      height: 52px;
       border-radius: 50%;
       border: 1px solid rgba(255,255,255,0.10);
       background: rgba(255,255,255,0.04);
@@ -170,16 +218,16 @@
       justify-content: center;
       transition: all 0.25s ease;
       backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      -webkit-tap-highlight-color: transparent;
     }
-    .btn-icon:hover {
-      border-color: rgba(255,255,255,0.25);
-      background: rgba(255,255,255,0.08);
-      color: #fff;
-      transform: scale(1.06);
+    .btn-icon:active {
+      background: rgba(255,255,255,0.12);
+      transform: scale(0.93);
     }
     .btn-main {
-      width: 70px;
-      height: 70px;
+      width: 74px;
+      height: 74px;
       border-radius: 50%;
       border: none;
       background: var(--accent);
@@ -191,9 +239,9 @@
       justify-content: center;
       transition: transform 0.2s ease, box-shadow 0.3s ease;
       box-shadow: 0 6px 26px var(--glow);
+      -webkit-tap-highlight-color: transparent;
     }
-    .btn-main:hover  { transform: scale(1.09); box-shadow: 0 10px 34px var(--glow); }
-    .btn-main:active { transform: scale(0.94); }
+    .btn-main:active { transform: scale(0.92); }
 
     @keyframes pulse-glow {
       0%,100% { box-shadow: 0 6px 26px var(--glow); }
@@ -203,10 +251,50 @@
 
     /* ── Session label ── */
     .session-label {
-      font-size: 0.74rem;
+      font-size: clamp(0.68rem, 2vw, 0.74rem);
       color: rgba(255,255,255,0.32);
       letter-spacing: 0.08em;
     }
+
+    /* ── Install banner ── */
+    #installBanner {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 14px;
+      padding: 10px 16px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      font-size: 0.78rem;
+      color: rgba(255,255,255,0.75);
+      max-width: 320px;
+      text-align: center;
+    }
+    #installBanner.visible { display: flex; }
+    #installBanner svg { flex-shrink: 0; color: var(--accent); }
+    #btnInstall {
+      background: var(--accent);
+      border: none;
+      border-radius: 8px;
+      padding: 6px 14px;
+      color: #fff;
+      font-family: inherit;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ── Completion flash ── */
+    @keyframes flash-bg {
+      0%   { background-color: transparent; }
+      20%  { background-color: rgba(255,107,53,0.15); }
+      100% { background-color: transparent; }
+    }
+    body.flash { animation: flash-bg 0.8s ease-out; }
   </style>
 </head>
 <body>
@@ -227,7 +315,6 @@
   <div class="timer-wrap">
     <svg class="timer-svg" viewBox="0 0 310 310" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <!-- Glow filter for the progress arc -->
         <filter id="arcGlow" x="-25%" y="-25%" width="150%" height="150%">
           <feGaussianBlur stdDeviation="4.5" result="blur"/>
           <feMerge>
@@ -236,7 +323,6 @@
           </feMerge>
         </filter>
 
-        <!-- Gradient that follows the arc colour theme -->
         <linearGradient id="arcGrad"
           x1="310" y1="0" x2="0" y2="310"
           gradientUnits="userSpaceOnUse">
@@ -245,11 +331,16 @@
           <stop offset="100%" id="g2"/>
         </linearGradient>
 
-        <!-- Soft radial fill inside the inner ring -->
         <radialGradient id="innerFill" cx="50%" cy="50%" r="50%">
           <stop offset="0%"   id="ig0" stop-opacity="0.08"/>
           <stop offset="100%" id="ig1" stop-opacity="0"/>
         </radialGradient>
+
+        <!-- Tip dot glow -->
+        <filter id="dotGlow" x="-100%" y="-100%" width="300%" height="300%">
+          <feGaussianBlur stdDeviation="3" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
       </defs>
 
       <!-- Outer decorative dashed ring -->
@@ -259,7 +350,7 @@
         stroke-width="1"
         stroke-dasharray="4 10"/>
 
-      <!-- Tick marks (generated by JS) -->
+      <!-- Tick marks -->
       <g id="ticks" opacity="0.22"></g>
 
       <!-- Track ring -->
@@ -272,7 +363,7 @@
       <!-- Inner radial glow -->
       <circle cx="155" cy="155" r="111" fill="url(#innerFill)"/>
 
-      <!-- Progress arc  ← this is the main graphic element -->
+      <!-- Progress arc -->
       <circle id="arc"
         cx="155" cy="155" r="122"
         fill="none"
@@ -280,6 +371,11 @@
         stroke-width="11"
         stroke-linecap="round"
         filter="url(#arcGlow)"/>
+
+      <!-- Moving tip dot on arc -->
+      <circle id="arcTip" cx="155" cy="33" r="6"
+        fill="white" opacity="0.9"
+        filter="url(#dotGlow)"/>
     </svg>
 
     <!-- Centered text overlay -->
@@ -299,7 +395,7 @@
   <div class="controls">
     <!-- Reset -->
     <button class="btn-icon" id="btnReset" title="Zurücksetzen (R)">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
            stroke="currentColor" stroke-width="2.5"
            stroke-linecap="round" stroke-linejoin="round">
         <path d="M1 4v6h6"/>
@@ -310,10 +406,10 @@
 
     <!-- Play / Pause -->
     <button class="btn-main" id="btnMain" title="Start / Pause (Leertaste)">
-      <svg id="icoPlay" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+      <svg id="icoPlay" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
         <polygon points="6,3 20,12 6,21"/>
       </svg>
-      <svg id="icoPause" width="22" height="22" viewBox="0 0 24 24"
+      <svg id="icoPause" width="24" height="24" viewBox="0 0 24 24"
            fill="currentColor" style="display:none">
         <rect x="5"  y="4" width="4" height="16" rx="1"/>
         <rect x="15" y="4" width="4" height="16" rx="1"/>
@@ -322,7 +418,7 @@
 
     <!-- Skip -->
     <button class="btn-icon" id="btnSkip" title="Überspringen">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
            stroke="currentColor" stroke-width="2.5"
            stroke-linecap="round" stroke-linejoin="round">
         <polygon points="5,4 15,12 5,20"/>
@@ -332,28 +428,41 @@
   </div>
 
   <div class="session-label" id="sessionLabel">Sitzung 1 von 4</div>
+
+  <!-- PWA Install Banner -->
+  <div id="installBanner">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+      <path d="M12 16l4-4-4-4M12 16V4"/><path d="M4 20h16"/>
+    </svg>
+    <span>Als App installieren</span>
+    <button id="btnInstall">Installieren</button>
+  </div>
 </div>
 
 <script>
 /* ── Config ───────────────────────────────────────────────────── */
 const CFG = {
-  work:  { sec: 25*60, label: 'Fokus',       c0:'#ffbe76', c1:'#ff6b35', c2:'#e84118', glow:'rgba(255,107,53,0.40)',   ig:'#ff6b35' },
-  short: { sec:  5*60, label: 'Kurze Pause', c0:'#55efc4', c1:'#1dd1a1', c2:'#00b894', glow:'rgba(29,209,161,0.38)',   ig:'#1dd1a1' },
-  long:  { sec: 15*60, label: 'Lange Pause', c0:'#a4c8ff', c1:'#54a0ff', c2:'#2e86de', glow:'rgba(84,160,255,0.38)',   ig:'#54a0ff' },
+  work:  { sec: 25*60, label: 'Fokus',       c0:'#ffbe76', c1:'#ff6b35', c2:'#e84118', glow:'rgba(255,107,53,0.40)',   ig:'#ff6b35',  tip:'#ffbe76' },
+  short: { sec:  5*60, label: 'Kurze Pause', c0:'#55efc4', c1:'#1dd1a1', c2:'#00b894', glow:'rgba(29,209,161,0.38)',   ig:'#1dd1a1',  tip:'#55efc4' },
+  long:  { sec: 15*60, label: 'Lange Pause', c0:'#a4c8ff', c1:'#54a0ff', c2:'#2e86de', glow:'rgba(84,160,255,0.38)',   ig:'#54a0ff',  tip:'#a4c8ff' },
 };
 
 const R    = 122;
-const CIRC = 2 * Math.PI * R; // ≈ 766.95
+const CX   = 155;
+const CY   = 155;
+const CIRC = 2 * Math.PI * R;
 
 /* ── State ────────────────────────────────────────────────────── */
 let mode        = 'work';
 let timeLeft    = CFG.work.sec;
 let running     = false;
 let timerId     = null;
-let doneInCycle = 0;          // 0-3 completed work sessions in cycle
+let doneInCycle = 0;
 
 /* ── DOM ──────────────────────────────────────────────────────── */
 const arc          = document.getElementById('arc');
+const arcTip       = document.getElementById('arcTip');
 const timeText     = document.getElementById('timeText');
 const modeText     = document.getElementById('modeText');
 const btnMain      = document.getElementById('btnMain');
@@ -363,9 +472,9 @@ const btnReset     = document.getElementById('btnReset');
 const btnSkip      = document.getElementById('btnSkip');
 const sessionLabel = document.getElementById('sessionLabel');
 const dots         = [1,2,3,4].map(i => document.getElementById('d'+i));
-const g0 = document.getElementById('g0');
-const g1 = document.getElementById('g1');
-const g2 = document.getElementById('g2');
+const g0  = document.getElementById('g0');
+const g1  = document.getElementById('g1');
+const g2  = document.getElementById('g2');
 const ig0 = document.getElementById('ig0');
 const ig1 = document.getElementById('ig1');
 
@@ -429,11 +538,24 @@ function applyTheme(key) {
   g2.setAttribute('stop-color', c.c2);
   ig0.setAttribute('stop-color', c.ig);
   ig1.setAttribute('stop-color', c.ig);
+  arcTip.setAttribute('fill', c.tip);
+  // Update theme-color meta tag
+  const tm = document.querySelector('meta[name="theme-color"]');
+  if (tm) tm.setAttribute('content', '#0a0a18');
 }
 
 function updateArc() {
   const frac = timeLeft / CFG[mode].sec;
-  arc.style.strokeDashoffset = (CIRC * (1 - frac)).toFixed(3);
+  const offset = CIRC * (1 - frac);
+  arc.style.strokeDashoffset = offset.toFixed(3);
+
+  // Move tip dot to the end of the arc
+  const angle = (frac * 2 * Math.PI) - Math.PI / 2;
+  const tx = CX + R * Math.cos(angle);
+  const ty = CY + R * Math.sin(angle);
+  arcTip.setAttribute('cx', tx.toFixed(2));
+  arcTip.setAttribute('cy', ty.toFixed(2));
+  arcTip.setAttribute('opacity', frac > 0.01 ? '0.9' : '0');
 }
 
 function updateDots() {
@@ -492,9 +614,36 @@ function playDone() {
   } catch(_) {}
 }
 
+/* ── Vibration (mobile) ───────────────────────────────────────── */
+function vibrate(pattern) {
+  if ('vibrate' in navigator) navigator.vibrate(pattern);
+}
+
+/* ── Flash body ───────────────────────────────────────────────── */
+function flashBody() {
+  document.body.classList.remove('flash');
+  void document.body.offsetWidth; // reflow
+  document.body.classList.add('flash');
+  setTimeout(() => document.body.classList.remove('flash'), 800);
+}
+
 /* ── Timer complete ───────────────────────────────────────────── */
 function onComplete() {
   playDone();
+  vibrate([200, 100, 200, 100, 400]);
+  flashBody();
+
+  // Notification
+  if (Notification && Notification.permission === 'granted') {
+    const label = mode === 'work' ? 'Fokus-Zeit vorbei!' : 'Pause vorbei!';
+    new Notification('Pomodoro', {
+      body: label + ' Nächste Phase startet.',
+      icon: 'icons/icon-192.svg',
+      badge: 'icons/icon-192.svg',
+      silent: true,
+    });
+  }
+
   if (mode === 'work') {
     doneInCycle++;
     if (doneInCycle >= 4) {
@@ -518,10 +667,15 @@ function stopTimer() {
 }
 
 function startTimer() {
+  // Request notification permission on first start
+  if (Notification && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
   running = true;
   btnMain.classList.add('running');
   icoPlay.style.display  = 'none';
   icoPause.style.display = '';
+  vibrate(50);
   timerId = setInterval(() => {
     timeLeft--;
     refresh();
@@ -535,6 +689,7 @@ function resetTimer() {
   stopTimer();
   timeLeft = CFG[mode].sec;
   refresh();
+  vibrate(30);
 }
 
 function skipTimer() {
@@ -557,6 +712,37 @@ document.addEventListener('keydown', e => {
   if (e.code === 'Space') { e.preventDefault(); toggleTimer(); }
   if (e.code === 'KeyR')  resetTimer();
 });
+
+/* ── PWA Install Prompt ───────────────────────────────────────── */
+let deferredInstallPrompt = null;
+const installBanner = document.getElementById('installBanner');
+const btnInstall    = document.getElementById('btnInstall');
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  installBanner.classList.add('visible');
+});
+
+btnInstall.addEventListener('click', async () => {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  const { outcome } = await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  installBanner.classList.remove('visible');
+});
+
+window.addEventListener('appinstalled', () => {
+  installBanner.classList.remove('visible');
+  deferredInstallPrompt = null;
+});
+
+/* ── Service Worker ───────────────────────────────────────────── */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
 
 /* ── Boot ─────────────────────────────────────────────────────── */
 applyTheme('work');
