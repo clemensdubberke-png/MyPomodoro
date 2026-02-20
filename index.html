@@ -2007,6 +2007,13 @@ function tick() {
 function startTimer() {
   if (mode === 'pause' && (breakBank <= 0 || timeLeft <= 0)) return;
 
+  /* Never run two timers in parallel */
+  if (screenTimeRunning) {
+    showToast('Bildschirmzeit läuft — bitte zuerst beenden');
+    vibrate(40);
+    return;
+  }
+
   if (Notification && Notification.permission === 'default') {
     Notification.requestPermission();
   }
@@ -2060,18 +2067,22 @@ document.querySelectorAll('.tab').forEach(tab =>
   tab.addEventListener('click', () => {
     if (tab.disabled) return;
     const target = tab.dataset.mode;
+
+    /* If any main timer is running, tab clicks ONLY switch the view —
+       never stop or restart the timer. The break timer in particular
+       must keep running until the user manually stops it or it expires. */
+    if (running) {
+      setViewTab(target);
+      return;
+    }
+
     if (target === 'pause') {
-      /* Always route pause through the slider so the user can choose
-         how many minutes to take — never consume the full bank silently. */
+      /* No timer running: route pause through the slider so the user
+         can choose how many minutes to take. */
       openSlider('earnedBreak');
       return;
     }
-    if (running && mode === 'work') {
-      /* Work timer is running: only update the view, don't touch the timer. */
-      setViewTab(target);
-    } else {
-      switchMode(target);
-    }
+    switchMode(target);
   })
 );
 
@@ -2141,6 +2152,14 @@ function stTick() {
 
 function startScreenTime(sessionSecs) {
   if (sessionSecs <= 0) return;
+
+  /* Never run two timers in parallel */
+  if (running) {
+    showToast('Fokus- oder Pausen-Timer läuft — bitte zuerst stoppen');
+    vibrate(40);
+    return;
+  }
+
   screenTimeRunning = true;
   screenTimeEpoch   = Date.now();
   screenTimeInit    = sessionSecs;
