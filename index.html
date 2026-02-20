@@ -548,6 +548,9 @@ let timerId      = null;
 let doneInCycle  = 0;    // sessions completed in current 4-session cycle (0-3)
 let breakBank    = 0;    // accumulated break seconds
 let breakAtStart = 0;    // bank value when current break session started (for arc)
+let overtime     = false; // work mode running past the 25-min mark
+let startEpoch   = null;  // Date.now() when timer last started/resumed
+let startLeft    = null;  // timeLeft value when timer last started/resumed
 
 /* ═══════════════════════════════════════════════════════════════
    DOM
@@ -623,6 +626,11 @@ function fmt(s) {
   return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
 }
 
+/* Shows "+MM:SS" when in overtime (timeLeft < 0) */
+function fmtDisplay(s) {
+  return s < 0 ? '+' + fmt(-s) : fmt(s);
+}
+
 function setCSSVar(name, val) {
   document.documentElement.style.setProperty(name, val);
 }
@@ -642,6 +650,12 @@ function applyTheme(key) {
 }
 
 function updateArc() {
+  /* In work overtime the arc stays fully depleted */
+  if (mode === 'work' && overtime) {
+    arc.style.strokeDashoffset = CIRC.toFixed(3);
+    arcTip.setAttribute('opacity', '0');
+    return;
+  }
   const total = mode === 'work' ? CFG.work.sec : Math.max(1, breakAtStart);
   const frac  = Math.max(0, Math.min(1, timeLeft / total));
   arc.style.strokeDashoffset = (CIRC * (1 - frac)).toFixed(3);
@@ -660,7 +674,7 @@ function updateBankDisplay() {
   const hasMoney = breakBank > 0;
 
   if (mode === 'pause') {
-    tabPause.innerHTML = `Pause <span class="tab-bank">${fmt(timeLeft)}</span>`;
+    tabPause.innerHTML = `Pause <span class="tab-bank">${fmt(Math.max(0, timeLeft))}</span>`;
     tabPause.disabled = false;
   } else if (hasMoney) {
     tabPause.innerHTML = `Pause <span class="tab-bank">${fmt(breakBank)}</span>`;
@@ -685,7 +699,7 @@ function updateLabel() {
 }
 
 function refresh() {
-  timeText.textContent = fmt(timeLeft);
+  timeText.textContent = fmtDisplay(timeLeft);
   updateArc();
   updateDots();
   updateLabel();
@@ -751,6 +765,7 @@ function notifyUser(msg) {
 ═══════════════════════════════════════════════════════════════ */
 function switchMode(key) {
   stopTimer();
+  overtime = false;
 
   /* Guard: can't switch to pause without a bank balance */
   if (key === 'pause' && breakBank <= 0) return;
@@ -776,30 +791,6 @@ function switchMode(key) {
 /* ═══════════════════════════════════════════════════════════════
    TIMER COMPLETE HANDLERS
 ═══════════════════════════════════════════════════════════════ */
-function onWorkComplete() {
-  playDone();
-  vibrate([200, 100, 200, 100, 400]);
-  flashBody();
-
-  doneInCycle++;
-  /* Every 4th session earns 15 min, all others earn 5 min */
-  const isLong  = doneInCycle % 4 === 0;
-  const earned  = isLong ? 15*60 : 5*60;
-  breakBank += earned;
-  if (doneInCycle >= 4) doneInCycle = 0;
-
-  const earnedLabel = isLong ? '15 Min' : '5 Min';
-  const msg = isLong
-    ? `Langer Zyklus abgeschlossen! +${earnedLabel} Guthaben`
-    : `25 Min geschafft! +${earnedLabel} Guthaben`;
-
-  notifyUser(msg);
-  showToast(msg);
-
-  /* Reset to work mode — user decides when to take the break */
-  switchMode('work');
-}
-
 function onPauseComplete() {
   /* Break bank fully used up */
   breakBank = 0;
@@ -817,10 +808,58 @@ function onPauseComplete() {
 function stopTimer() {
   if (timerId) { clearInterval(timerId); timerId = null; }
   running = false;
+  startEpoch = null;
+  startLeft  = null;
   btnMain.classList.remove('running');
   icoPlay.style.display  = '';
   icoPause.style.display = 'none';
-  /* Break bank stays in sync (updated every tick in startTimer) */
+}
+
+/* Core tick — called by setInterval and also directly on visibilitychange */
+function tick() {
+  if (!running || startEpoch === null) return;
+
+  /* Always derive timeLeft from real-world elapsed time.
+     This keeps the timer accurate even when the tab was frozen
+     in the background (mobile browsers throttle setInterval). */
+  const elapsed = Math.floor((Date.now() - startEpoch) / 1000);
+  timeLeft = startLeft - elapsed;
+
+  if (mode === 'pause') {
+    breakBank = Math.max(0, timeLeft);
+    refresh();
+    if (timeLeft <= 0) {
+      clearInterval(timerId); timerId = null; running = false;
+      startEpoch = null; startLeft = null;
+      btnMain.classList.remove('running');
+      icoPlay.style.display  = '';
+      icoPause.style.display = 'none';
+      onPauseComplete();
+    }
+    return;
+  }
+
+  /* Work mode: signal once when the 25-min mark is crossed.
+     The timer keeps running — user stops it manually. */
+  if (timeLeft <= 0 && !overtime) {
+    overtime = true;
+    doneInCycle++;
+    const isLong  = doneInCycle % 4 === 0;
+    const earned  = isLong ? 15*60 : 5*60;
+    breakBank += earned;
+    if (doneInCycle >= 4) doneInCycle = 0;
+    const earnedLabel = isLong ? '15 Min' : '5 Min';
+    const msg = isLong
+      ? `Langer Zyklus! +${earnedLabel} — stoppe wenn du Pause machen willst`
+      : `25 Min geschafft! +${earnedLabel} — stoppe wenn du Pause machen willst`;
+    playDone();
+    vibrate([200, 100, 200, 100, 400]);
+    flashBody();
+    notifyUser(msg);
+    showToast(msg);
+  }
+
+  refresh();
 }
 
 function startTimer() {
@@ -836,26 +875,11 @@ function startTimer() {
   icoPause.style.display = '';
   vibrate(50);
 
-  timerId = setInterval(() => {
-    timeLeft--;
+  /* Record start reference so tick() can compute exact elapsed time */
+  startEpoch = Date.now();
+  startLeft  = timeLeft;
 
-    /* Keep break bank in sync with the running timer */
-    if (mode === 'pause') breakBank = Math.max(0, timeLeft);
-
-    refresh();
-
-    if (timeLeft <= 0) {
-      clearInterval(timerId);
-      timerId = null;
-      running = false;
-      btnMain.classList.remove('running');
-      icoPlay.style.display  = '';
-      icoPause.style.display = 'none';
-
-      if (mode === 'work') onWorkComplete();
-      else                 onPauseComplete();
-    }
-  }, 1000);
+  timerId = setInterval(tick, 1000);
 }
 
 function toggleTimer() {
@@ -864,6 +888,7 @@ function toggleTimer() {
 
 function resetTimer() {
   stopTimer();
+  overtime = false;
   /* Always return to work mode on reset; break bank is preserved */
   if (mode !== 'work') {
     mode = 'work';
@@ -892,6 +917,13 @@ document.querySelectorAll('.tab').forEach(tab =>
 document.addEventListener('keydown', e => {
   if (e.code === 'Space') { e.preventDefault(); toggleTimer(); }
   if (e.code === 'KeyR')  resetTimer();
+});
+
+/* When the app comes back to the foreground after being backgrounded,
+   immediately recalculate timeLeft from the real elapsed time so the
+   display is never stale (mobile browsers throttle/freeze setInterval). */
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && running) tick();
 });
 
 /* ═══════════════════════════════════════════════════════════════
