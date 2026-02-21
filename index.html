@@ -1557,9 +1557,12 @@ function loadState() {
     const s = JSON.parse(raw);
     if (typeof s.coins          === 'number') coins          = s.coins;
     if (typeof s.breakBank      === 'number') breakBank      = s.breakBank;
-    if (typeof s.extraBreakBank === 'number') extraBreakBank = s.extraBreakBank;
     if (typeof s.screenTimeBank === 'number') screenTimeBank = s.screenTimeBank;
     if (typeof s.doneInCycle    === 'number') doneInCycle    = s.doneInCycle;
+    /* Migration: old extraBreakBank (purchased but not yet activated) → breakBank */
+    if (typeof s.extraBreakBank === 'number' && s.extraBreakBank > 0) {
+      breakBank += s.extraBreakBank;
+    }
   } catch(_) {}
 }
 
@@ -2123,10 +2126,10 @@ function buyExtraBreak30() {
     vibrate(40);
     return;
   }
-  coins -= 3;
-  extraBreakBank += 30 * 60; // 1 800 s — waits in bank until slider confirms
+  coins    -= 3;
+  breakBank += 30 * 60; // 1 800 s — sofort ins Pausen-Guthaben
   updateCoinDisplay();
-  updateBreakCardUI();
+  refresh(); // Tab-Badge und Pause-Button sofort aktualisieren
   showToast('+30 Min Pausenguthaben gutgeschrieben!');
   vibrate([60, 30, 60]);
 }
