@@ -2123,11 +2123,12 @@ function buyExtraBreak30() {
     vibrate(40);
     return;
   }
-  coins         -= 3;
-  extraBreakBank += 30 * 60; // 1 800 s → Karte zeigt Guthaben + "Nutzen"-Button
+  coins     -= 3;
+  breakBank += 30 * 60; // 1 800 s — sofort im Pausen-Guthaben sichtbar
   updateCoinDisplay();
-  updateBreakCardUI();
-  showToast('+30 Min Extra-Pause gutgeschrieben — klick "Nutzen" zum Aktivieren!');
+  refresh(); // Pause-Tab-Badge und Bank-Zeile sofort aktualisieren
+  rewardsOverlay.classList.remove('open'); // Overlay schließen → User sieht das Badge
+  showToast('+30 Min Pause gutgeschrieben!');
   vibrate([60, 30, 60]);
 }
 btnBuy30min.addEventListener('click', buyExtraBreak30);
