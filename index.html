@@ -2000,7 +2000,7 @@ function tick() {
       const isLong  = doneInCycle % 4 === 0;
       const earned  = isLong ? 15*60 : 5*60;
       breakBank += earned;
-      coins++; updateCoinDisplay(); // 1 Münze pro 25-Min-Block
+      if (isLong) { coins++; updateCoinDisplay(); }
       if (doneInCycle >= 4) doneInCycle = 0;
       saveState();
       const earnedLabel = isLong ? '15 Min' : '5 Min';
