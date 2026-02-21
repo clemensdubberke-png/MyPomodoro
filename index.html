@@ -1255,13 +1255,11 @@
         <div class="reward-info">
           <div class="reward-name">Extra-Pause</div>
           <div class="reward-duration">+30 Minuten</div>
-          <div class="bt-bank-row">⏱ <span id="btBankDisplay">0:00</span> verfügbar</div>
         </div>
 
         <div class="reward-right">
           <div class="reward-cost"><span>✦</span> 3</div>
           <button class="btn-buy" id="btnBuy30min">Kaufen</button>
-          <button class="btn-use-bt" id="btnUseBreakTime">Nutzen</button>
         </div>
       </div>
 
@@ -1545,7 +1543,7 @@ const STATE_KEY = 'pomodoroAppState';
 function saveState() {
   try {
     localStorage.setItem(STATE_KEY, JSON.stringify({
-      coins, breakBank, extraBreakBank, screenTimeBank, doneInCycle,
+      coins, breakBank, screenTimeBank, doneInCycle,
     }));
   } catch(_) {}
 }
@@ -1557,7 +1555,8 @@ function loadState() {
     const s = JSON.parse(raw);
     if (typeof s.coins          === 'number') coins          = s.coins;
     if (typeof s.breakBank      === 'number') breakBank      = s.breakBank;
-    if (typeof s.extraBreakBank === 'number') extraBreakBank = s.extraBreakBank;
+    // Migrate: altes extraBreakBank-Guthaben direkt zu breakBank addieren
+    if (typeof s.extraBreakBank === 'number' && s.extraBreakBank > 0) breakBank += s.extraBreakBank;
     if (typeof s.screenTimeBank === 'number') screenTimeBank = s.screenTimeBank;
     if (typeof s.doneInCycle    === 'number') doneInCycle    = s.doneInCycle;
   } catch(_) {}
@@ -1604,9 +1603,6 @@ const codeInputField    = document.getElementById('codeInputField');
 const codeInputTitle    = document.getElementById('codeInputTitle');
 const btnCodeCancel     = document.getElementById('btnCodeCancel');
 const btnCodeSave       = document.getElementById('btnCodeSave');
-const breakTimeCard     = document.getElementById('breakTimeCard');
-const btBankDisplay     = document.getElementById('btBankDisplay');
-const btnUseBreakTime   = document.getElementById('btnUseBreakTime');
 const sliderOverlay     = document.getElementById('sliderOverlay');
 const sliderIcon        = document.getElementById('sliderIcon');
 const sliderTitle       = document.getElementById('sliderTitle');
@@ -1863,11 +1859,6 @@ function updateScreenTimeUI() {
   if (has) stBankDisplay.textContent = fmt(screenTimeBank);
 }
 
-function updateBreakCardUI() {
-  const has = extraBreakBank > 0;
-  breakTimeCard.classList.toggle('has-bank', has);
-  if (has) btBankDisplay.textContent = fmt(extraBreakBank);
-}
 
 function updateCodeCardUI() {
   codeCard.classList.remove('code-card--empty', 'code-card--locked', 'code-card--revealed');
@@ -2221,9 +2212,7 @@ function updateSliderTrack() {
 function updateSliderDisplay() {
   const mins      = parseInt(timeSlider.value);
   const chosen    = mins * 60;
-  const bank      = sliderContext === 'screenTime'  ? screenTimeBank
-                  : sliderContext === 'earnedBreak'  ? breakBank
-                  :                                   extraBreakBank;
+  const bank      = sliderContext === 'screenTime' ? screenTimeBank : breakBank;
   const remaining = bank - chosen;
   sliderDisplay.textContent   = fmt(chosen);
   sliderRemaining.textContent = remaining > 0
@@ -2233,9 +2222,7 @@ function updateSliderDisplay() {
 }
 
 function openSlider(ctx) {
-  const bank    = ctx === 'screenTime' ? screenTimeBank
-                : ctx === 'earnedBreak' ? breakBank
-                :                        extraBreakBank;
+  const bank    = ctx === 'screenTime' ? screenTimeBank : breakBank;
   const maxMins = Math.floor(bank / 60);
   if (maxMins < 1) {
     showToast('Nicht genug Guthaben (mind. 1 Minute)');
@@ -2247,9 +2234,8 @@ function openSlider(ctx) {
   sliderOverlay.style.setProperty('--slider-color', color);
   sliderIcon.innerHTML    = ctx === 'screenTime' ? _stSVG : _breakSVG;
   sliderIcon.style.color  = color;
-  sliderTitle.textContent = ctx === 'screenTime'  ? 'Wie viel Bildschirmzeit?'
-                          : ctx === 'earnedBreak'  ? 'Wie lange möchtest du Pause machen?'
-                          :                          'Wie viel Zusatzpause?';
+  sliderTitle.textContent = ctx === 'screenTime' ? 'Wie viel Bildschirmzeit?'
+                          :                       'Wie lange möchtest du Pause machen?';
   timeSlider.min   = 1;
   timeSlider.max   = maxMins;
   timeSlider.value = maxMins;
@@ -2261,7 +2247,6 @@ function openSlider(ctx) {
 
 timeSlider.addEventListener('input', updateSliderDisplay);
 btnUseScreenTime.addEventListener('click', () => openSlider('screenTime'));
-btnUseBreakTime .addEventListener('click', () => openSlider('break'));
 btnSliderCancel .addEventListener('click', () => sliderOverlay.classList.remove('open'));
 
 btnSliderStart.addEventListener('click', () => {
@@ -2276,18 +2261,6 @@ btnSliderStart.addEventListener('click', () => {
        breakBank itself is left untouched so it shows the correct total. */
     switchMode('pause', chosen);
     startTimer();
-  } else {
-    extraBreakBank -= chosen;
-    updateBreakCardUI();
-    breakBank += chosen;
-    if (mode === 'pause') {
-      timeLeft     += chosen;
-      breakAtStart  = Math.max(breakAtStart, timeLeft);
-      if (running) startLeft += chosen;
-    }
-    refresh();
-    showToast(`+${fmt(chosen)} Pause hinzugefügt!`);
-    vibrate(80);
   }
   saveState();
 });
@@ -2412,7 +2385,6 @@ applyTheme('work');
 refresh();
 updateCoinDisplay();
 updateScreenTimeUI();
-updateBreakCardUI();
 updateCodeCardUI();
 </script>
 </body>
