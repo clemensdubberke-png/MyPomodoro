@@ -2372,8 +2372,19 @@ window.addEventListener('appinstalled', () => {
    SERVICE WORKER
 ═══════════════════════════════════════════════════════════════ */
 if ('serviceWorker' in navigator) {
+  /* Reload the page when a new service worker takes control */
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    window.location.reload();
+  });
+
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
+    navigator.serviceWorker
+      .register('./sw.js', { updateViaCache: 'none' })
+      .then(reg => {
+        /* Check for a new SW version every time the page is loaded */
+        reg.update().catch(() => {});
+      })
+      .catch(() => {});
   });
 }
 
