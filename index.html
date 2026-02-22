@@ -893,7 +893,7 @@
       align-items: center;
       gap: 4px;
     }
-    .code-cost span { color: var(--accent); font-size: 0.80rem; }
+    .code-cost span { color: #ffe566; font-size: 0.80rem; }
 
     .btn-set-code {
       padding: 7px 13px;
@@ -1311,7 +1311,7 @@
         </div>
 
         <div class="reward-right">
-          <div class="code-cost"><span>✦</span> 2</div>
+          <div class="code-cost"><span>✦</span> 4</div>
           <button class="btn-set-code"   id="btnSetCode">Festlegen</button>
           <button class="btn-buy"        id="btnRevealCode">Enthüllen</button>
           <button class="btn-hide-code"  id="btnHideCode">Verstecken</button>
@@ -1849,7 +1849,7 @@ function updateCoinDisplay() {
   btnRewards.classList.toggle('has-coins', coins > 0);
   btnBuy30min.classList.toggle('can-afford', coins >= 3);
   btnBuyScreenTime.classList.toggle('can-afford', coins >= 2);
-  if (secretCode && !codeRevealed) btnRevealCode.classList.toggle('can-afford', coins >= 2);
+  if (secretCode && !codeRevealed) btnRevealCode.classList.toggle('can-afford', coins >= 4);
   saveState();
 }
 
@@ -1870,7 +1870,7 @@ function updateCodeCardUI() {
   } else {
     codeCard.classList.add('code-card--locked');
   }
-  btnRevealCode.classList.toggle('can-afford', coins >= 2);
+  btnRevealCode.classList.toggle('can-afford', coins >= 4);
 }
 
 /* Updates tab highlight + viewMode without touching the timer */
@@ -2303,12 +2303,12 @@ function saveCode() {
 }
 
 btnRevealCode.addEventListener('click', () => {
-  if (coins < 2) {
-    showToast('Nicht genug Münzen — du brauchst 2 ✦');
+  if (coins < 4) {
+    showToast('Nicht genug Münzen — du brauchst 4 ✦');
     vibrate(40);
     return;
   }
-  coins -= 2;
+  coins -= 4;
   codeRevealed = true;
   updateCoinDisplay();
   updateCodeCardUI();
