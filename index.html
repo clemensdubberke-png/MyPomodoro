@@ -877,13 +877,13 @@
     .code-cost,
     .btn-set-code,
     #btnRevealCode,
-    .btn-hide-code,
+    .code-expiry,
     .btn-change-code { display: none; }
 
     .code-card--empty    .btn-set-code  { display: block; }
     .code-card--locked   .code-cost     { display: flex;  }
     .code-card--locked   #btnRevealCode { display: block; }
-    .code-card--revealed .btn-hide-code   { display: block; }
+    .code-card--revealed .code-expiry     { display: block; }
     .code-card--revealed .btn-change-code { display: block; }
 
     .code-cost {
@@ -911,21 +911,12 @@
     }
     .btn-set-code:active { transform: scale(0.92); }
 
-    .btn-hide-code {
-      padding: 7px 13px;
-      border-radius: 100px;
-      border: 1px solid rgba(255,255,255,0.11);
-      background: rgba(255,255,255,0.05);
-      color: rgba(255,255,255,0.42);
-      font-family: inherit;
-      font-size: 0.74rem;
-      font-weight: 600;
-      cursor: pointer;
+    .code-expiry {
+      font-size: 0.66rem;
+      color: rgba(255,255,255,0.38);
+      text-align: right;
       white-space: nowrap;
-      -webkit-tap-highlight-color: transparent;
-      transition: background 0.2s, transform 0.15s;
     }
-    .btn-hide-code:active { transform: scale(0.92); }
 
     .btn-change-code {
       padding: 4px 10px;
@@ -1314,7 +1305,7 @@
           <div class="code-cost"><span>✦</span> 4</div>
           <button class="btn-set-code"   id="btnSetCode">Festlegen</button>
           <button class="btn-buy"        id="btnRevealCode">Enthüllen</button>
-          <button class="btn-hide-code"  id="btnHideCode">Verstecken</button>
+          <div class="code-expiry" id="codeExpiryDisplay"></div>
           <button class="btn-change-code" id="btnChangeCode">Ändern</button>
         </div>
       </div>
@@ -1534,6 +1525,7 @@ let sliderContext   = null; // 'screenTime' | 'break' | 'earnedBreak'
 
 let secretCode   = localStorage.getItem('pomodoroSecretCode') || '';
 let codeRevealed = false;  // always starts hidden on fresh page load
+let codeRevealExpiry = 0;  // timestamp (ms) when the 24h reveal window ends
 
 /* ═══════════════════════════════════════════════════════════════
    PERSISTENCE
@@ -1596,7 +1588,7 @@ const codeCard          = document.getElementById('codeCard');
 const codeRevealText    = document.getElementById('codeRevealText');
 const btnSetCode        = document.getElementById('btnSetCode');
 const btnRevealCode     = document.getElementById('btnRevealCode');
-const btnHideCode       = document.getElementById('btnHideCode');
+const codeExpiryDisplay = document.getElementById('codeExpiryDisplay');
 const btnChangeCode     = document.getElementById('btnChangeCode');
 const codeInputOverlay  = document.getElementById('codeInputOverlay');
 const codeInputField    = document.getElementById('codeInputField');
@@ -1867,10 +1859,27 @@ function updateCodeCardUI() {
   } else if (codeRevealed) {
     codeCard.classList.add('code-card--revealed');
     codeRevealText.textContent = secretCode;
+    updateCodeExpiryDisplay();
   } else {
     codeCard.classList.add('code-card--locked');
   }
   btnRevealCode.classList.toggle('can-afford', coins >= 4);
+}
+
+/* Show remaining time in the revealed-code card */
+let codeExpiryInterval = null;
+function updateCodeExpiryDisplay() {
+  clearInterval(codeExpiryInterval);
+  function tick() {
+    if (!codeRevealed || !codeRevealExpiry) return;
+    const diff = codeRevealExpiry - Date.now();
+    if (diff <= 0) { codeExpiryDisplay.textContent = ''; return; }
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    codeExpiryDisplay.textContent = 'noch ' + h + 'h ' + m + 'min sichtbar';
+  }
+  tick();
+  codeExpiryInterval = setInterval(tick, 60000); // update every minute
 }
 
 /* Updates tab highlight + viewMode without touching the timer */
@@ -2293,12 +2302,16 @@ function saveCode() {
     codeInputField.focus();
     return;
   }
-  secretCode   = val;
-  codeRevealed = false;
+  secretCode = val;
   localStorage.setItem('pomodoroSecretCode', secretCode);
   codeInputOverlay.classList.remove('open');
+
+  /* If changed during 24h window → keep revealed; otherwise lock it */
+  if (!(codeRevealed && codeRevealExpiry > Date.now())) {
+    codeRevealed = false;
+  }
   updateCodeCardUI();
-  showToast('Code gespeichert und gesperrt 🔒');
+  showToast(codeRevealed ? 'Code geändert!' : 'Code gespeichert und gesperrt 🔒');
   vibrate([60, 30, 60]);
 }
 
@@ -2310,16 +2323,39 @@ btnRevealCode.addEventListener('click', () => {
   }
   coins -= 4;
   codeRevealed = true;
+  codeRevealExpiry = Date.now() + 24 * 60 * 60 * 1000; // 24 h
+  localStorage.setItem('pomodoroCodeRevealExpiry', codeRevealExpiry);
   updateCoinDisplay();
   updateCodeCardUI();
-  showToast('Code enthüllt!');
+  scheduleCodeAutoHide();
+  showToast('Code für 24 Stunden enthüllt!');
   vibrate(80);
+  saveState();
 });
 
-btnHideCode.addEventListener('click', () => {
-  codeRevealed = false;
-  updateCodeCardUI();
-});
+/* Auto-hide: sperrt den Code, sobald die 24 h abgelaufen sind */
+let codeAutoHideTimer = null;
+function scheduleCodeAutoHide() {
+  clearTimeout(codeAutoHideTimer);
+  if (!codeRevealed || !codeRevealExpiry) return;
+  const remaining = codeRevealExpiry - Date.now();
+  if (remaining <= 0) {
+    codeRevealed = false;
+    codeRevealExpiry = 0;
+    localStorage.removeItem('pomodoroCodeRevealExpiry');
+    updateCodeCardUI();
+    return;
+  }
+  // setTimeout max is ~24.8 days (2^31 ms), so 24 h is fine
+  codeAutoHideTimer = setTimeout(() => {
+    codeRevealed = false;
+    codeRevealExpiry = 0;
+    localStorage.removeItem('pomodoroCodeRevealExpiry');
+    updateCodeCardUI();
+    showToast('Code wieder gesperrt 🔒');
+    vibrate([60, 30, 60]);
+  }, remaining);
+}
 
 document.addEventListener('keydown', e => {
   if (e.code === 'Space') { e.preventDefault(); toggleTimer(); }
@@ -2337,6 +2373,15 @@ document.addEventListener('visibilitychange', () => {
   } else {
     if (running)            tick();
     if (screenTimeRunning)  stTick();
+    /* Check if the 24h code reveal window expired while in background */
+    if (codeRevealed && codeRevealExpiry && Date.now() >= codeRevealExpiry) {
+      codeRevealed = false;
+      codeRevealExpiry = 0;
+      localStorage.removeItem('pomodoroCodeRevealExpiry');
+      updateCodeCardUI();
+    } else if (codeRevealed) {
+      updateCodeExpiryDisplay();
+    }
   }
 });
 
@@ -2392,6 +2437,20 @@ if ('serviceWorker' in navigator) {
    BOOT
 ═══════════════════════════════════════════════════════════════ */
 loadState();
+
+/* Restore 24h code reveal window from localStorage */
+(function restoreCodeReveal() {
+  const stored = parseInt(localStorage.getItem('pomodoroCodeRevealExpiry'), 10);
+  if (stored && stored > Date.now()) {
+    codeRevealed = true;
+    codeRevealExpiry = stored;
+    scheduleCodeAutoHide();
+  } else if (stored) {
+    /* 24h expired while page was closed — clean up */
+    localStorage.removeItem('pomodoroCodeRevealExpiry');
+  }
+})();
+
 applyTheme('work');
 refresh();
 updateCoinDisplay();
