@@ -1759,86 +1759,84 @@ function showToast(msg) {
    SOUND  +  BACKGROUND TIMER (Web Worker)
 ═══════════════════════════════════════════════════════════════ */
 
-/* ── Pre-load Pause.mp3 so play() is instant even in background ── */
-let breakEndAudio = null;
-let breakEndPlaying = false;   // true while Pause.mp3 is playing
-try {
-  breakEndAudio = new Audio('./Pause.mp3');
-  breakEndAudio.preload = 'auto';
-  breakEndAudio.load();
-} catch (_) {}
-
-function playBreakEnd() {
-  breakEndPlaying = true;
-  try {
-    if (breakEndAudio) {
-      breakEndAudio.currentTime = 0;
-      breakEndAudio.play().catch(() => {});
-      breakEndAudio.onended = breakEndFinished;
-      breakEndAudio.onerror = breakEndFinished;
-    } else {
-      const a = new Audio('./Pause.mp3');
-      a.play().catch(() => {});
-      a.onended = breakEndFinished;
-      a.onerror = breakEndFinished;
-    }
-    /* Safety net: force cleanup after 20s even if events don't fire */
-    setTimeout(breakEndFinished, 20000);
-  } catch (_) { breakEndFinished(); }
-}
-
-function breakEndFinished() {
-  if (!breakEndPlaying) return; // already handled
-  breakEndPlaying = false;
-  stopKeepAlive();
-}
-
-/* ── Silent audio keep-alive ──
-   A looping <audio> element playing near-silence tells the browser
-   "this tab is producing media" and prevents it from fully freezing.
-   Combined with the Web Worker timer below, this ensures the sound
-   fires even with the screen off. */
+/* ── Audio keep-alive using Pause.mp3 itself ──
+   Chrome Android suspends tabs when the screen is off.  A synthetic
+   silent WAV is detected as "not real media" and ignored.
+   Instead we loop Pause.mp3 at near-zero volume — Chrome sees a real
+   MP3 in the media pipeline and keeps the tab alive.
+   When the timer ends we simply set volume=1 and loop=false;
+   no new Audio element is started in the background. */
 let keepAliveAudio = null;
-(function createKeepAliveAudio() {
-  try {
-    const sr = 44100, sec = 2, len = sr * sec;
-    const ab = new ArrayBuffer(44 + len * 2);
-    const v  = new DataView(ab);
-    const w  = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
-    w(0,'RIFF'); v.setUint32(4, 36 + len * 2, true);
-    w(8,'WAVE'); w(12,'fmt ');
-    v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
-    v.setUint32(24,sr,true); v.setUint32(28,sr*2,true);
-    v.setUint16(32,2,true);  v.setUint16(34,16,true);
-    w(36,'data'); v.setUint32(40, len * 2, true);
-    for (let i = 0; i < len; i++) v.setInt16(44 + i * 2, 1, true);
-    const url = URL.createObjectURL(new Blob([ab], { type: 'audio/wav' }));
-    keepAliveAudio = new Audio(url);
-    keepAliveAudio.loop   = true;
-    keepAliveAudio.volume = 0.01;
-  } catch (_) {}
-})();
+let breakEndPlaying = false;
+try {
+  keepAliveAudio = new Audio('./Pause.mp3');
+  keepAliveAudio.preload = 'auto';
+  keepAliveAudio.loop    = true;
+  keepAliveAudio.volume  = 0.005;  // near-inaudible while looping
+  keepAliveAudio.load();
+} catch (_) {}
 
 function startKeepAlive() {
   clearTimeout(stopKeepAliveTimer);
-  if (keepAliveAudio && keepAliveAudio.paused) {
-    keepAliveAudio.play().catch(() => {});
+  if (keepAliveAudio) {
+    keepAliveAudio.loop   = true;
+    keepAliveAudio.volume = 0.005;
+    if (keepAliveAudio.paused) keepAliveAudio.play().catch(() => {});
   }
 }
+
 let stopKeepAliveTimer = null;
 function stopKeepAlive() {
-  /* Don't stop while Pause.mp3 is still playing — breakEndFinished will call us again */
   if (breakEndPlaying) return;
   if (!running && !screenTimeRunning && keepAliveAudio) {
     clearTimeout(stopKeepAliveTimer);
-    /* Small grace period, then stop the silent loop */
     stopKeepAliveTimer = setTimeout(() => {
       if (!running && !screenTimeRunning && !breakEndPlaying && keepAliveAudio) {
         keepAliveAudio.pause();
         keepAliveAudio.currentTime = 0;
+        keepAliveAudio.loop   = true;
+        keepAliveAudio.volume = 0.005;
       }
     }, 2000);
   }
+}
+
+/* Play the break-end sound by "unmuting" the already-playing MP3.
+   Because the audio element is already in the browser's media pipeline,
+   this works even with the screen off — no new play() call needed. */
+function playBreakEnd() {
+  breakEndPlaying = true;
+  clearTimeout(stopKeepAliveTimer);
+  if (keepAliveAudio) {
+    keepAliveAudio.loop   = false;
+    keepAliveAudio.currentTime = 0;
+    keepAliveAudio.volume = 1.0;
+    /* If paused for some reason, resume */
+    if (keepAliveAudio.paused) keepAliveAudio.play().catch(() => {});
+    keepAliveAudio.onended = breakEndFinished;
+    keepAliveAudio.onerror = breakEndFinished;
+  } else {
+    /* Fallback: fresh element */
+    try {
+      const a = new Audio('./Pause.mp3');
+      a.play().catch(() => {});
+      a.onended = breakEndFinished;
+    } catch (_) { breakEndFinished(); }
+  }
+  setTimeout(breakEndFinished, 20000); // safety net
+}
+
+function breakEndFinished() {
+  if (!breakEndPlaying) return;
+  breakEndPlaying = false;
+  /* Reset back to keep-alive mode (paused) */
+  if (keepAliveAudio) {
+    keepAliveAudio.onended = null;
+    keepAliveAudio.onerror = null;
+    keepAliveAudio.loop    = true;
+    keepAliveAudio.volume  = 0.005;
+  }
+  stopKeepAlive();
 }
 
 /* ── Web Worker background timer ──
