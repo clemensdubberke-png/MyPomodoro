@@ -1805,12 +1805,9 @@ function prerenderToWav(notes, noteGap) {
   });
 }
 
-/* Pre-render both chimes at startup */
-let doneAudioUrl     = null;   // work-done   (4 notes, fast)
-let breakEndAudioUrl = null;   // break-end   (3 notes, slow bell)
-
+/* Pre-render work-done chime (4 notes, fast) */
+let doneAudioUrl = null;
 prerenderToWav([523, 659, 784, 1047], 0.16).then(url => { doneAudioUrl = url; });
-prerenderToWav([523, 659, 784],       0.32).then(url => { breakEndAudioUrl = url; });
 
 /* Play a pre-rendered WAV via <audio> — works in background */
 function playWav(url) {
@@ -1822,10 +1819,10 @@ function playDone() {
   playWav(doneAudioUrl);
 }
 
-/* Soft bell-chime played when a break (Pause or Bildschirmzeit) ends.
-   Uses the pre-rendered WAV so it can play with screen off. */
+/* Break-end sound: Pause.mp3 — plays via <audio> element so it works
+   even when the tab is backgrounded or the screen is off. */
 function playBreakEnd() {
-  playWav(breakEndAudioUrl);
+  try { const a = new Audio('./Pause.mp3'); a.play().catch(() => {}); } catch (_) {}
 }
 
 function vibrate(pattern) {
