@@ -2287,6 +2287,12 @@ btnSliderStart.addEventListener('click', () => {
   const chosen = parseInt(timeSlider.value) * 60;
   sliderOverlay.classList.remove('open');
   if (sliderContext === 'screenTime') {
+    /* Guard: don't deduct if startScreenTime will reject (e.g. focus timer running) */
+    if (running) {
+      showToast('Fokus- oder Pausen-Timer läuft — bitte zuerst stoppen');
+      vibrate(40);
+      return;
+    }
     screenTimeBank -= chosen;
     updateScreenTimeUI();
     startScreenTime(chosen);
