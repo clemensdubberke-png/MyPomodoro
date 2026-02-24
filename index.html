@@ -1759,10 +1759,49 @@ function showToast(msg) {
    SOUND
 ═══════════════════════════════════════════════════════════════ */
 
-/* ── Helper: render oscillator tones to a WAV blob URL ──
-   OfflineAudioContext renders the sound ahead-of-time into a WAV.
-   Playing the resulting blob via <audio> works even when the tab
-   is backgrounded or the screen is off (Web Audio API does NOT). */
+/* ── Silent audio keep-alive ──
+   Mobile browsers suspend JS + audio when the tab is backgrounded or
+   the screen turns off.  A looping <audio> element playing near-silence
+   tells the browser "this tab is producing media" and prevents it from
+   fully freezing the page.  This allows Pause.mp3 to play reliably
+   when a timer ends, even with the screen off. */
+let keepAliveAudio = null;
+(function createKeepAliveAudio() {
+  try {
+    const sr = 44100, sec = 2, len = sr * sec;
+    const ab = new ArrayBuffer(44 + len * 2);
+    const v  = new DataView(ab);
+    const w  = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    w(0,'RIFF'); v.setUint32(4, 36 + len * 2, true);
+    w(8,'WAVE'); w(12,'fmt ');
+    v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+    v.setUint32(24,sr,true); v.setUint32(28,sr*2,true);
+    v.setUint16(32,2,true);  v.setUint16(34,16,true);
+    w(36,'data'); v.setUint32(40, len * 2, true);
+    /* Write near-silence: amplitude 1 (inaudible, but not zero so
+       the browser treats it as active media playback) */
+    for (let i = 0; i < len; i++) v.setInt16(44 + i * 2, 1, true);
+    const url = URL.createObjectURL(new Blob([ab], { type: 'audio/wav' }));
+    keepAliveAudio = new Audio(url);
+    keepAliveAudio.loop   = true;
+    keepAliveAudio.volume = 0.01;   // practically inaudible
+  } catch (_) {}
+})();
+
+function startKeepAlive() {
+  if (keepAliveAudio && keepAliveAudio.paused) {
+    keepAliveAudio.play().catch(() => {});
+  }
+}
+function stopKeepAlive() {
+  /* Only stop if NO timer is active anymore */
+  if (!running && !screenTimeRunning && keepAliveAudio) {
+    keepAliveAudio.pause();
+    keepAliveAudio.currentTime = 0;
+  }
+}
+
+/* ── Helper: render oscillator tones to a WAV blob URL ── */
 function prerenderToWav(notes, noteGap) {
   return new Promise(resolve => {
     try {
@@ -1787,7 +1826,6 @@ function prerenderToWav(notes, noteGap) {
         const d   = buf.getChannelData(0), len = d.length;
         const ab  = new ArrayBuffer(44 + len * 2);
         const v   = new DataView(ab);
-        /* RIFF / WAV header */
         const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
         w(0,'RIFF'); v.setUint32(4, 36 + len * 2, true);
         w(8,'WAVE'); w(12,'fmt ');
@@ -1819,8 +1857,8 @@ function playDone() {
   playWav(doneAudioUrl);
 }
 
-/* Break-end sound: Pause.mp3 — plays via <audio> element so it works
-   even when the tab is backgrounded or the screen is off. */
+/* Break-end sound: Pause.mp3 — plays via <audio> element.
+   The keep-alive loop ensures the browser hasn't frozen the tab. */
 function playBreakEnd() {
   try { const a = new Audio('./Pause.mp3'); a.play().catch(() => {}); } catch (_) {}
 }
@@ -1980,6 +2018,7 @@ function stopTimer() {
   btnMain.classList.remove('running');
   icoPlay.style.display  = '';
   icoPause.style.display = 'none';
+  stopKeepAlive();
 }
 
 /* Core tick — called by setInterval and also directly on visibilitychange */
@@ -2067,6 +2106,7 @@ function startTimer() {
   startLeft  = timeLeft;
 
   timerId = setInterval(tick, 1000);
+  startKeepAlive();
 }
 
 function toggleTimer() {
@@ -2184,6 +2224,7 @@ function stTick() {
     screenTimeBanner.classList.remove('active');
     updateScreenTimeUI();
     playBreakEnd();
+    stopKeepAlive();
     vibrate([200, 100, 200]);
     notifyUser('Bildschirmzeit abgelaufen — Zeit für etwas anderes! 📵');
     showToast('Bildschirmzeit aufgebraucht!');
@@ -2210,6 +2251,7 @@ function startScreenTime(sessionSecs) {
   stbTime.textContent = fmt(sessionSecs);
   screenTimeBanner.classList.add('active');
   screenTimeTimerId = setInterval(stTick, 1000);
+  startKeepAlive();
   vibrate(80);
 }
 
@@ -2228,6 +2270,7 @@ function endScreenTimeEarly() {
     : 'Bildschirmzeit aufgebraucht';
   showToast(msg);
   vibrate(40);
+  stopKeepAlive();
 }
 
 btnBuyScreenTime.addEventListener('click', buyScreenTime);
