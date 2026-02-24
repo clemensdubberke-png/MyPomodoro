@@ -1756,15 +1756,35 @@ function showToast(msg) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   SOUND
+   SOUND  +  BACKGROUND TIMER (Web Worker)
 ═══════════════════════════════════════════════════════════════ */
 
+/* ── Pre-load Pause.mp3 so play() is instant even in background ── */
+let breakEndAudio = null;
+try {
+  breakEndAudio = new Audio('./Pause.mp3');
+  breakEndAudio.preload = 'auto';
+  breakEndAudio.load();
+} catch (_) {}
+
+function playBreakEnd() {
+  try {
+    /* Clone from pre-loaded source for instant playback */
+    const a = new Audio('./Pause.mp3');
+    a.play().catch(() => {});
+    /* Also try the pre-loaded element as fallback */
+    if (breakEndAudio) {
+      breakEndAudio.currentTime = 0;
+      breakEndAudio.play().catch(() => {});
+    }
+  } catch (_) {}
+}
+
 /* ── Silent audio keep-alive ──
-   Mobile browsers suspend JS + audio when the tab is backgrounded or
-   the screen turns off.  A looping <audio> element playing near-silence
-   tells the browser "this tab is producing media" and prevents it from
-   fully freezing the page.  This allows Pause.mp3 to play reliably
-   when a timer ends, even with the screen off. */
+   A looping <audio> element playing near-silence tells the browser
+   "this tab is producing media" and prevents it from fully freezing.
+   Combined with the Web Worker timer below, this ensures the sound
+   fires even with the screen off. */
 let keepAliveAudio = null;
 (function createKeepAliveAudio() {
   try {
@@ -1778,27 +1798,22 @@ let keepAliveAudio = null;
     v.setUint32(24,sr,true); v.setUint32(28,sr*2,true);
     v.setUint16(32,2,true);  v.setUint16(34,16,true);
     w(36,'data'); v.setUint32(40, len * 2, true);
-    /* Write near-silence: amplitude 1 (inaudible, but not zero so
-       the browser treats it as active media playback) */
     for (let i = 0; i < len; i++) v.setInt16(44 + i * 2, 1, true);
     const url = URL.createObjectURL(new Blob([ab], { type: 'audio/wav' }));
     keepAliveAudio = new Audio(url);
     keepAliveAudio.loop   = true;
-    keepAliveAudio.volume = 0.01;   // practically inaudible
+    keepAliveAudio.volume = 0.01;
   } catch (_) {}
 })();
 
 function startKeepAlive() {
-  clearTimeout(stopKeepAliveTimer);  // cancel any pending stop
+  clearTimeout(stopKeepAliveTimer);
   if (keepAliveAudio && keepAliveAudio.paused) {
     keepAliveAudio.play().catch(() => {});
   }
 }
 let stopKeepAliveTimer = null;
 function stopKeepAlive() {
-  /* Only stop if NO timer is active anymore.
-     Delay so a just-started Pause.mp3 can finish playing.
-     If a new timer starts before the delay, startKeepAlive() cancels it. */
   if (!running && !screenTimeRunning && keepAliveAudio) {
     clearTimeout(stopKeepAliveTimer);
     stopKeepAliveTimer = setTimeout(() => {
@@ -1806,8 +1821,50 @@ function stopKeepAlive() {
         keepAliveAudio.pause();
         keepAliveAudio.currentTime = 0;
       }
-    }, 15000); // 15 s — enough for any sound to finish
+    }, 15000);
   }
+}
+
+/* ── Web Worker background timer ──
+   Main-thread setInterval is throttled down to 0 Hz when the screen is
+   off on Android.  A Web Worker runs in a separate thread and keeps
+   ticking.  When the scheduled end-time is reached the worker posts a
+   message; the main thread wakes up to handle it, plays the sound, and
+   fires the completion logic. */
+let bgWorker = null;
+try {
+  const code = [
+    'let timers={};',
+    'setInterval(()=>{',
+    '  const now=Date.now();',
+    '  for(const id in timers){',
+    '    if(now>=timers[id]){',
+    '      postMessage(id);',
+    '      delete timers[id];',
+    '    }',
+    '  }',
+    '},500);',
+    'onmessage=e=>{',
+    '  if(e.data.end) timers[e.data.id]=e.data.end;',
+    '  else delete timers[e.data.id];',
+    '};'
+  ].join('\n');
+  bgWorker = new Worker(URL.createObjectURL(
+    new Blob([code], { type: 'application/javascript' })
+  ));
+  bgWorker.onmessage = function(e) {
+    const id = e.data;
+    if (id === 'pause'      && running && mode === 'pause')  tick();
+    if (id === 'screenTime' && screenTimeRunning)            stTick();
+  };
+} catch (_) {}
+
+/* Schedule / cancel a background alarm in the worker */
+function setBgTimer(id, endTime) {
+  if (bgWorker) bgWorker.postMessage({ id: id, end: endTime });
+}
+function clearBgTimer(id) {
+  if (bgWorker) bgWorker.postMessage({ id: id });
 }
 
 /* ── Helper: render oscillator tones to a WAV blob URL ── */
@@ -1856,7 +1913,6 @@ function prerenderToWav(notes, noteGap) {
 let doneAudioUrl = null;
 prerenderToWav([523, 659, 784, 1047], 0.16).then(url => { doneAudioUrl = url; });
 
-/* Play a pre-rendered WAV via <audio> — works in background */
 function playWav(url) {
   if (!url) return;
   try { const a = new Audio(url); a.play().catch(() => {}); } catch (_) {}
@@ -1864,16 +1920,6 @@ function playWav(url) {
 
 function playDone() {
   playWav(doneAudioUrl);
-}
-
-/* Break-end sound: Pause.mp3 — plays via <audio> element.
-   The keep-alive loop ensures the browser hasn't frozen the tab.
-   We keep the keep-alive running until the MP3 has finished. */
-function playBreakEnd() {
-  try {
-    const a = new Audio('./Pause.mp3');
-    a.play().catch(() => {});
-  } catch (_) {}
 }
 
 function vibrate(pattern) {
@@ -2031,6 +2077,7 @@ function stopTimer() {
   btnMain.classList.remove('running');
   icoPlay.style.display  = '';
   icoPause.style.display = 'none';
+  clearBgTimer('pause');
   stopKeepAlive();
 }
 
@@ -2052,6 +2099,7 @@ function tick() {
       timeLeft  = 0;
       breakBank = breakBankReserved;
       clearInterval(timerId); timerId = null; running = false;
+      clearBgTimer('pause');
       startEpoch = null; startLeft = null;
       btnMain.classList.remove('running');
       icoPlay.style.display  = '';
@@ -2120,6 +2168,11 @@ function startTimer() {
 
   timerId = setInterval(tick, 1000);
   startKeepAlive();
+
+  /* Schedule Web Worker alarm for pause end (works with screen off) */
+  if (mode === 'pause') {
+    setBgTimer('pause', Date.now() + timeLeft * 1000);
+  }
 }
 
 function toggleTimer() {
@@ -2236,6 +2289,7 @@ function stTick() {
     screenTimeRunning = false; screenTimeEpoch = null;
     screenTimeBanner.classList.remove('active');
     updateScreenTimeUI();
+    clearBgTimer('screenTime');
     playBreakEnd();
     stopKeepAlive();
     vibrate([200, 100, 200]);
@@ -2265,6 +2319,7 @@ function startScreenTime(sessionSecs) {
   screenTimeBanner.classList.add('active');
   screenTimeTimerId = setInterval(stTick, 1000);
   startKeepAlive();
+  setBgTimer('screenTime', Date.now() + sessionSecs * 1000);
   vibrate(80);
 }
 
@@ -2274,6 +2329,7 @@ function endScreenTimeEarly() {
   const unused  = Math.max(0, screenTimeInit - elapsed);
   if (unused > 0) screenTimeBank += unused; // return unspent portion to bank
   clearInterval(screenTimeTimerId); screenTimeTimerId = null;
+  clearBgTimer('screenTime');
   screenTimeRunning = false; screenTimeEpoch = null;
   screenTimeBanner.classList.remove('active');
   updateScreenTimeUI();
