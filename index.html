@@ -1791,22 +1791,52 @@ function showToast(msg) {
 /* ═══════════════════════════════════════════════════════════════
    SOUND  –  Pause.mp3  +  Keep-Alive Audio  +  Wake Lock
    ---------------------------------------------------------------
-   Chrome on Android FREEZES all JavaScript (setInterval, setTimeout,
-   audio.play) when the tab is backgrounded or the screen is off.
-   Exception: tabs that are actively playing audio are NOT frozen.
+   Chrome on Android FREEZES all JS when the tab is backgrounded
+   or the screen is off.  Exception: tabs playing audio via an
+   <audio> element are NOT frozen.
 
-   Strategy:  While a pause / screen-time timer runs, we loop a tiny
-   near-silent WAV on a single <audio> element.  This keeps the tab
-   alive.  When the timer ends we switch THAT SAME element's source
-   from the silent WAV to Pause.mp3 and set volume to 1.  Because
-   the element is already "unlocked" (started from a user gesture),
-   the source-switch and play works reliably — even with the screen
-   off.  Using the same element avoids Android blocking a second
-   audio stream.
+   Architecture (two layers):
+   ┌─────────────────────────────────────────────────────┐
+   │  <audio> element   – loops near-silent WAV          │
+   │  (keeps the tab alive — never interrupted)          │
+   ├─────────────────────────────────────────────────────┤
+   │  AudioContext       – plays decoded Pause.mp3       │
+   │  (BufferSource from pre-decoded ArrayBuffer)        │
+   └─────────────────────────────────────────────────────┘
+
+   The <audio> element keeps the tab alive.  When the timer ends,
+   Pause.mp3 is played through the AudioContext (already decoded
+   in memory — no network needed).  The <audio> element continues
+   playing underneath, so there is NEVER a gap without active audio.
+   After Pause.mp3 finishes, everything is cleaned up.
 ═══════════════════════════════════════════════════════════════ */
-const BELL_DEBOUNCE_MS = 3000; // min gap between two playBreakEnd() calls
+const BELL_DEBOUNCE_MS = 3000;
 
-/* ── Wake Lock: prevents the device from sleeping ── */
+/* ── AudioContext + pre-decoded Pause.mp3 buffer ── */
+let _audioCtx    = null;
+let _pauseBuffer = null;   // decoded AudioBuffer of Pause.mp3
+
+function getAudioCtx() {
+  if (!_audioCtx || _audioCtx.state === 'closed') {
+    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (_audioCtx.state === 'suspended') _audioCtx.resume().catch(() => {});
+  return _audioCtx;
+}
+
+/* Fetch + decode Pause.mp3 into an AudioBuffer.
+   Called when a timer starts so the buffer is ready when needed. */
+function preloadPauseBuffer() {
+  if (_pauseBuffer) return;  // already loaded
+  const ctx = getAudioCtx();
+  fetch('Pause.mp3')
+    .then(r => r.arrayBuffer())
+    .then(buf => ctx.decodeAudioData(buf))
+    .then(decoded => { _pauseBuffer = decoded; })
+    .catch(() => {});
+}
+
+/* ── Wake Lock ── */
 let wakeLock = null;
 
 async function requestWakeLock() {
@@ -1825,11 +1855,11 @@ function releaseWakeLock() {
   }
 }
 
-/* ── Keep-alive: near-silent WAV loop ──
-   Generates a tiny 1-second mono WAV (8 kHz, 16-bit) with amplitude 1
-   (inaudible but not bitwise-silent, so Chrome won't discard it). */
+/* ── Keep-alive: near-silent WAV loop (<audio> element) ──
+   This element is ONLY used to keep the tab alive.  It is NEVER
+   used to play Pause.mp3 (that goes through the AudioContext). */
 let keepAliveAudio = null;
-let silentWavUrl   = null;   // cached data-URI
+let silentWavUrl   = null;
 
 function getSilentWav() {
   if (silentWavUrl) return silentWavUrl;
@@ -1852,14 +1882,12 @@ function getSilentWav() {
 }
 
 function startKeepAlive() {
-  if (keepAliveAudio) return;          // already running
+  if (keepAliveAudio) return;
   keepAliveAudio = new Audio(getSilentWav());
   keepAliveAudio.loop   = true;
-  keepAliveAudio.volume = 0.01;        // near-silent
+  keepAliveAudio.volume = 0.01;
   keepAliveAudio.play().catch(() => {});
 
-  /* Media Session: tells Android this tab is an active media player
-     → system keeps the tab alive and shows a persistent notification. */
   if ('mediaSession' in navigator) {
     navigator.mediaSession.metadata = new MediaMetadata({
       title:  'Timer läuft',
@@ -1871,12 +1899,15 @@ function startKeepAlive() {
   }
 
   requestWakeLock();
+
+  /* Pre-decode Pause.mp3 so it's instantly available at timer end */
+  preloadPauseBuffer();
 }
 
 function stopKeepAlive() {
   if (keepAliveAudio) {
     keepAliveAudio.pause();
-    keepAliveAudio.src = '';            // release resources
+    keepAliveAudio.src = '';
     keepAliveAudio = null;
   }
   if ('mediaSession' in navigator) {
@@ -1887,29 +1918,44 @@ function stopKeepAlive() {
   releaseWakeLock();
 }
 
-/* Play Pause.mp3.  Debounced against duplicate triggers.
-   CRITICAL: We reuse the SAME keepAliveAudio element that is already
-   playing (and thus already "unlocked" by the browser).  We switch
-   its source from the silent WAV to Pause.mp3 and raise the volume.
-   This avoids the Android limitation of only one active audio stream
-   and guarantees the play() call succeeds. */
+/* ── Play Pause.mp3 via AudioContext ──
+   The keepAliveAudio (<audio>) keeps running underneath — no gap.
+   The decoded buffer is played through the AudioContext which runs
+   alongside the <audio> element without conflict. */
 function playBreakEnd() {
   const now = Date.now();
   if (now - lastBreakEndSoundTime < BELL_DEBOUNCE_MS) return;
   lastBreakEndSoundTime = now;
 
-  if (keepAliveAudio) {
-    /* Switch the already-playing element to Pause.mp3 */
-    keepAliveAudio.loop   = false;
-    keepAliveAudio.volume = 1.0;
-    keepAliveAudio.src    = 'Pause.mp3';
-    keepAliveAudio.play().catch(() => {});
-    keepAliveAudio.addEventListener('ended', () => stopKeepAlive(), { once: true });
-    setTimeout(() => stopKeepAlive(), 30000);  // safety
+  const ctx = getAudioCtx();
+
+  if (_pauseBuffer) {
+    /* Primary path: play pre-decoded buffer (instant, no network) */
+    const source = ctx.createBufferSource();
+    source.buffer = _pauseBuffer;
+    source.connect(ctx.destination);
+    source.start();
+    source.onended = () => stopKeepAlive();
+    setTimeout(() => stopKeepAlive(), 30000);
   } else {
-    /* No keepalive running (foreground / recovery case) — fresh element */
-    const a = new Audio('Pause.mp3');
-    a.play().catch(() => {});
+    /* Buffer not yet decoded — fetch + decode + play on the fly */
+    fetch('Pause.mp3')
+      .then(r => r.arrayBuffer())
+      .then(buf => ctx.decodeAudioData(buf))
+      .then(decoded => {
+        _pauseBuffer = decoded;
+        const source = ctx.createBufferSource();
+        source.buffer = decoded;
+        source.connect(ctx.destination);
+        source.start();
+        source.onended = () => stopKeepAlive();
+        setTimeout(() => stopKeepAlive(), 30000);
+      })
+      .catch(() => {
+        /* Last resort fallback */
+        new Audio('Pause.mp3').play().catch(() => {});
+        setTimeout(() => stopKeepAlive(), 5000);
+      });
   }
 }
 
@@ -2538,6 +2584,11 @@ document.addEventListener('visibilitychange', () => {
   } else {
     /* Re-acquire Wake Lock — it is released when the page goes hidden */
     if (running || screenTimeRunning) requestWakeLock();
+
+    /* Resume AudioContext — Android suspends it when page goes hidden */
+    if (_audioCtx && _audioCtx.state === 'suspended') {
+      _audioCtx.resume().catch(() => {});
+    }
 
     /* Resume keepalive audio if it was paused by the OS */
     if (keepAliveAudio && keepAliveAudio.paused) {
