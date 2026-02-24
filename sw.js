@@ -42,7 +42,7 @@ self.addEventListener('notificationclick', e => {
       })
   );
 });
-const CACHE = 'pomodoro-v12';
+const CACHE = 'pomodoro-v13';
 
 /* Static assets that rarely change — safe to serve from cache */
 const STATIC_ASSETS = [
@@ -50,6 +50,7 @@ const STATIC_ASSETS = [
   './icons/icon-192.svg',
   './icons/icon-512.svg',
   './icons/icon-maskable.svg',
+  './Pause.mp3',
 ];
 
 /* Install: pre-cache only static assets.
