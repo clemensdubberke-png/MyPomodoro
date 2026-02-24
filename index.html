@@ -1836,10 +1836,22 @@ function preloadPauseBuffer() {
     .catch(() => {});
 }
 
-/* ── Wake Lock ── */
+/* ── Wake Lock: keeps the screen ON while a timer runs ──
+   The Screen Wake Lock API prevents the display from dimming /
+   turning off automatically.  This is essential because Chrome
+   on Android cannot play audio when the screen is off.
+
+   Caveats:
+   - The lock is automatically released when the tab loses visibility
+     (user switches app, presses home).  We re-acquire it immediately
+     on visibilitychange → visible.
+   - If the user presses the POWER BUTTON, the screen turns off and
+     the lock is lost.  There is no web API to prevent that.  We show
+     a toast reminding the user to keep the screen on. */
 let wakeLock = null;
 
 async function requestWakeLock() {
+  if (wakeLock) return;  // already held
   try {
     if ('wakeLock' in navigator) {
       wakeLock = await navigator.wakeLock.request('screen');
@@ -2233,6 +2245,7 @@ function startTimer() {
   if (mode === 'pause') {
     /* Keep-alive: loop silent audio so Android doesn't freeze the tab */
     startKeepAlive();
+    showToast('Bitte Bildschirm anlassen — Timer läuft');
 
     if (pauseEndTimeoutId) clearTimeout(pauseEndTimeoutId);
     pauseEndTimeoutId = setTimeout(() => {
@@ -2410,6 +2423,7 @@ function startScreenTime(sessionSecs) {
 
   /* Keep-alive: loop silent audio so Android doesn't freeze the tab */
   startKeepAlive();
+  showToast('Bitte Bildschirm anlassen — Timer läuft');
 
   /* Backup setTimeout + SW scheduling (same pattern as pause timer) */
   if (stEndTimeoutId) clearTimeout(stEndTimeoutId);
