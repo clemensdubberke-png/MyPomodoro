@@ -1789,15 +1789,24 @@ let keepAliveAudio = null;
 })();
 
 function startKeepAlive() {
+  clearTimeout(stopKeepAliveTimer);  // cancel any pending stop
   if (keepAliveAudio && keepAliveAudio.paused) {
     keepAliveAudio.play().catch(() => {});
   }
 }
+let stopKeepAliveTimer = null;
 function stopKeepAlive() {
-  /* Only stop if NO timer is active anymore */
+  /* Only stop if NO timer is active anymore.
+     Delay so a just-started Pause.mp3 can finish playing.
+     If a new timer starts before the delay, startKeepAlive() cancels it. */
   if (!running && !screenTimeRunning && keepAliveAudio) {
-    keepAliveAudio.pause();
-    keepAliveAudio.currentTime = 0;
+    clearTimeout(stopKeepAliveTimer);
+    stopKeepAliveTimer = setTimeout(() => {
+      if (!running && !screenTimeRunning && keepAliveAudio) {
+        keepAliveAudio.pause();
+        keepAliveAudio.currentTime = 0;
+      }
+    }, 15000); // 15 s — enough for any sound to finish
   }
 }
 
@@ -1858,9 +1867,13 @@ function playDone() {
 }
 
 /* Break-end sound: Pause.mp3 — plays via <audio> element.
-   The keep-alive loop ensures the browser hasn't frozen the tab. */
+   The keep-alive loop ensures the browser hasn't frozen the tab.
+   We keep the keep-alive running until the MP3 has finished. */
 function playBreakEnd() {
-  try { const a = new Audio('./Pause.mp3'); a.play().catch(() => {}); } catch (_) {}
+  try {
+    const a = new Audio('./Pause.mp3');
+    a.play().catch(() => {});
+  } catch (_) {}
 }
 
 function vibrate(pattern) {

@@ -12,7 +12,7 @@ self.addEventListener('notificationclick', e => {
       })
   );
 });
-const CACHE = 'pomodoro-v18';
+const CACHE = 'pomodoro-v19';
 
 /* Static assets that rarely change — safe to serve from cache */
 const STATIC_ASSETS = [
