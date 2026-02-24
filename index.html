@@ -1789,17 +1789,78 @@ function showToast(msg) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   SOUND  –  Pause.mp3
+   SOUND  –  Pause.mp3  +  Keep-Alive Audio
    ---------------------------------------------------------------
-   Uses a preloaded <audio> element pointing at Pause.mp3.
-   On the first user gesture we call .load() + a short silent play
-   so that Android considers audio "user-activated" and allows
-   .play() later — even when the screen is off or the app is
-   backgrounded.
+   Chrome on Android FREEZES all JavaScript (setInterval, setTimeout,
+   audio.play) when the tab is backgrounded or the screen is off.
+   Exception: tabs that are actively playing audio are NOT frozen.
+
+   Strategy:  While a pause / screen-time timer runs, we loop a tiny
+   near-silent WAV.  This keeps the tab alive so setInterval fires
+   normally and Pause.mp3 can play at the exact moment the timer ends
+   — even with the screen off.  We also register a Media Session so
+   Android shows a persistent media notification.
 ═══════════════════════════════════════════════════════════════ */
 const BELL_DEBOUNCE_MS = 3000; // min gap between two playBreakEnd() calls
 const pauseAudio = new Audio('Pause.mp3');
 pauseAudio.preload = 'auto';
+
+/* ── Keep-alive: near-silent WAV loop ──
+   Generates a tiny 1-second mono WAV (8 kHz, 16-bit) with amplitude 1
+   (inaudible but not bitwise-silent, so Chrome won't discard it). */
+let keepAliveAudio = null;
+
+function createSilentWav() {
+  const sr = 8000, dur = 1, n = sr * dur, dataSize = n * 2;
+  const buf = new ArrayBuffer(44 + dataSize);
+  const v   = new DataView(buf);
+  const ws  = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  ws(0,'RIFF'); v.setUint32(4, 36 + dataSize, true);
+  ws(8,'WAVE'); ws(12,'fmt ');
+  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,sr,true); v.setUint32(28,sr*2,true);
+  v.setUint16(32,2,true);  v.setUint16(34,16,true);
+  ws(36,'data'); v.setUint32(40, dataSize, true);
+  for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, 1, true);
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return 'data:audio/wav;base64,' + btoa(bin);
+}
+
+function startKeepAlive() {
+  if (keepAliveAudio) return;          // already running
+  keepAliveAudio = new Audio(createSilentWav());
+  keepAliveAudio.loop   = true;
+  keepAliveAudio.volume = 0.01;        // near-silent
+  keepAliveAudio.play().catch(() => {});
+
+  /* Media Session: tells Android this tab is an active media player
+     → system keeps the tab alive and shows a persistent notification. */
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title:  'Timer läuft',
+      artist: 'MyPomodoro',
+      album:  'Pomodoro Timer',
+    });
+    /* Prevent "pause" from media controls from killing our keepalive */
+    navigator.mediaSession.setActionHandler('pause', () => {});
+    navigator.mediaSession.setActionHandler('play',  () => {});
+  }
+}
+
+function stopKeepAlive() {
+  if (keepAliveAudio) {
+    keepAliveAudio.pause();
+    keepAliveAudio.src = '';            // release resources
+    keepAliveAudio = null;
+  }
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.metadata = null;
+    try { navigator.mediaSession.setActionHandler('pause', null); } catch(_) {}
+    try { navigator.mediaSession.setActionHandler('play',  null); } catch(_) {}
+  }
+}
 
 /* Unlock audio on first user gesture (required by mobile browsers).
    We do a tiny silent play so the browser allows future .play() calls
@@ -1967,6 +2028,7 @@ function onPauseComplete() {
   /* Cancel the backup setTimeout so it doesn't fire again */
   if (pauseEndTimeoutId) { clearTimeout(pauseEndTimeoutId); pauseEndTimeoutId = null; }
   clearRunningTimer();
+  stopKeepAlive();
 
   /* Session timer ran out. The last tick already set
      breakBank = breakBankReserved + 0 = reserved unspent portion.
@@ -1996,6 +2058,7 @@ function stopTimer() {
   startLeft  = null;
   clearRunningTimer();
   cancelSWTimer();
+  stopKeepAlive();
   btnMain.classList.remove('running');
   icoPlay.style.display  = '';
   icoPause.style.display = 'none';
@@ -2098,6 +2161,9 @@ function startTimer() {
      backgrounded — this setTimeout fires even in many throttled
      scenarios and triggers the completion handler. */
   if (mode === 'pause') {
+    /* Keep-alive: loop silent audio so Android doesn't freeze the tab */
+    startKeepAlive();
+
     if (pauseEndTimeoutId) clearTimeout(pauseEndTimeoutId);
     pauseEndTimeoutId = setTimeout(() => {
       if (running && mode === 'pause') tick();
@@ -2230,6 +2296,7 @@ function stTick() {
 
     if (stEndTimeoutId) { clearTimeout(stEndTimeoutId); stEndTimeoutId = null; }
     clearRunningTimer();
+    stopKeepAlive();
 
     clearInterval(screenTimeTimerId); screenTimeTimerId = null;
     screenTimeRunning = false; screenTimeEpoch = null;
@@ -2270,6 +2337,9 @@ function startScreenTime(sessionSecs) {
   screenTimeTimerId = setInterval(stTick, 1000);
   vibrate(80);
 
+  /* Keep-alive: loop silent audio so Android doesn't freeze the tab */
+  startKeepAlive();
+
   /* Backup setTimeout + SW scheduling (same pattern as pause timer) */
   if (stEndTimeoutId) clearTimeout(stEndTimeoutId);
   stEndTimeoutId = setTimeout(() => {
@@ -2286,6 +2356,7 @@ function endScreenTimeEarly() {
   if (stEndTimeoutId) { clearTimeout(stEndTimeoutId); stEndTimeoutId = null; }
   clearRunningTimer();
   cancelSWTimer();
+  stopKeepAlive();
   const elapsed = Math.floor((Date.now() - screenTimeEpoch) / 1000);
   const unused  = Math.max(0, screenTimeInit - elapsed);
   if (unused > 0) screenTimeBank += unused; // return unspent portion to bank
