@@ -1789,7 +1789,7 @@ function showToast(msg) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   SOUND  –  Pause.mp3  +  Keep-Alive Audio
+   SOUND  –  Pause.mp3  +  Keep-Alive Audio  +  Wake Lock
    ---------------------------------------------------------------
    Chrome on Android FREEZES all JavaScript (setInterval, setTimeout,
    audio.play) when the tab is backgrounded or the screen is off.
@@ -1798,12 +1798,39 @@ function showToast(msg) {
    Strategy:  While a pause / screen-time timer runs, we loop a tiny
    near-silent WAV.  This keeps the tab alive so setInterval fires
    normally and Pause.mp3 can play at the exact moment the timer ends
-   — even with the screen off.  We also register a Media Session so
-   Android shows a persistent media notification.
+   — even with the screen off.
+
+   When the timer ends:
+     1. Play Pause.mp3  (tab stays alive because audio is playing)
+     2. Wait for Pause.mp3 to finish  (ended event)
+     3. THEN stop the keepalive loop
+
+   Additionally we use the Wake Lock API to prevent the device from
+   entering deep sleep, and the Media Session API to register as an
+   active media player.
 ═══════════════════════════════════════════════════════════════ */
 const BELL_DEBOUNCE_MS = 3000; // min gap between two playBreakEnd() calls
 const pauseAudio = new Audio('Pause.mp3');
 pauseAudio.preload = 'auto';
+
+/* ── Wake Lock: prevents the device from sleeping ── */
+let wakeLock = null;
+
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    }
+  } catch(_) {}
+}
+
+function releaseWakeLock() {
+  if (wakeLock) {
+    wakeLock.release().catch(() => {});
+    wakeLock = null;
+  }
+}
 
 /* ── Keep-alive: near-silent WAV loop ──
    Generates a tiny 1-second mono WAV (8 kHz, 16-bit) with amplitude 1
@@ -1847,6 +1874,8 @@ function startKeepAlive() {
     navigator.mediaSession.setActionHandler('pause', () => {});
     navigator.mediaSession.setActionHandler('play',  () => {});
   }
+
+  requestWakeLock();
 }
 
 function stopKeepAlive() {
@@ -1860,6 +1889,7 @@ function stopKeepAlive() {
     try { navigator.mediaSession.setActionHandler('pause', null); } catch(_) {}
     try { navigator.mediaSession.setActionHandler('play',  null); } catch(_) {}
   }
+  releaseWakeLock();
 }
 
 /* Unlock audio on first user gesture (required by mobile browsers).
@@ -1880,7 +1910,10 @@ document.addEventListener('click',     unlockAudio, { once: true });
 document.addEventListener('touchstart', unlockAudio, { once: true });
 
 /* Play Pause.mp3. Debounced to prevent the sound from firing
-   multiple times when setInterval + visibilitychange race on Android. */
+   multiple times when setInterval + visibilitychange race on Android.
+   IMPORTANT: stopKeepAlive() is called AFTER Pause.mp3 finishes playing
+   (via the 'ended' event) — never before.  Stopping the keepalive loop
+   first would cause Chrome to freeze the tab and cut off the sound. */
 function playBreakEnd() {
   const now = Date.now();
   if (now - lastBreakEndSoundTime < BELL_DEBOUNCE_MS) return;
@@ -1888,6 +1921,14 @@ function playBreakEnd() {
 
   pauseAudio.currentTime = 0;
   pauseAudio.play().catch(() => {});
+
+  /* Stop the keepalive loop only AFTER Pause.mp3 has finished playing.
+     This ensures the tab stays "alive" (active audio) throughout.
+     Safety timeout in case 'ended' never fires. */
+  const cleanup = () => stopKeepAlive();
+  pauseAudio.removeEventListener('ended', cleanup);
+  pauseAudio.addEventListener('ended', cleanup, { once: true });
+  setTimeout(cleanup, 30000);  // safety: max 30s
 }
 
 function vibrate(pattern) {
@@ -2028,7 +2069,8 @@ function onPauseComplete() {
   /* Cancel the backup setTimeout so it doesn't fire again */
   if (pauseEndTimeoutId) { clearTimeout(pauseEndTimeoutId); pauseEndTimeoutId = null; }
   clearRunningTimer();
-  stopKeepAlive();
+  /* NOTE: stopKeepAlive() is NOT called here — playBreakEnd() handles it
+     after Pause.mp3 finishes, to avoid cutting off the sound. */
 
   /* Session timer ran out. The last tick already set
      breakBank = breakBankReserved + 0 = reserved unspent portion.
@@ -2296,7 +2338,8 @@ function stTick() {
 
     if (stEndTimeoutId) { clearTimeout(stEndTimeoutId); stEndTimeoutId = null; }
     clearRunningTimer();
-    stopKeepAlive();
+    /* NOTE: stopKeepAlive() is NOT called here — playBreakEnd() handles it
+       after Pause.mp3 finishes, to avoid cutting off the sound. */
 
     clearInterval(screenTimeTimerId); screenTimeTimerId = null;
     screenTimeRunning = false; screenTimeEpoch = null;
@@ -2511,6 +2554,14 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     saveState();
   } else {
+    /* Re-acquire Wake Lock — it is released when the page goes hidden */
+    if (running || screenTimeRunning) requestWakeLock();
+
+    /* Resume keepalive audio if it was paused by the OS */
+    if (keepAliveAudio && keepAliveAudio.paused) {
+      keepAliveAudio.play().catch(() => {});
+    }
+
     if (running)            tick();
     if (screenTimeRunning)  stTick();
 
