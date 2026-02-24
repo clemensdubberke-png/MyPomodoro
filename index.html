@@ -1761,6 +1761,7 @@ function showToast(msg) {
 
 /* ── Pre-load Pause.mp3 so play() is instant even in background ── */
 let breakEndAudio = null;
+let breakEndPlaying = false;   // true while Pause.mp3 is playing
 try {
   breakEndAudio = new Audio('./Pause.mp3');
   breakEndAudio.preload = 'auto';
@@ -1768,16 +1769,28 @@ try {
 } catch (_) {}
 
 function playBreakEnd() {
+  breakEndPlaying = true;
   try {
-    /* Clone from pre-loaded source for instant playback */
-    const a = new Audio('./Pause.mp3');
-    a.play().catch(() => {});
-    /* Also try the pre-loaded element as fallback */
     if (breakEndAudio) {
       breakEndAudio.currentTime = 0;
       breakEndAudio.play().catch(() => {});
+      breakEndAudio.onended = breakEndFinished;
+      breakEndAudio.onerror = breakEndFinished;
+    } else {
+      const a = new Audio('./Pause.mp3');
+      a.play().catch(() => {});
+      a.onended = breakEndFinished;
+      a.onerror = breakEndFinished;
     }
-  } catch (_) {}
+    /* Safety net: force cleanup after 20s even if events don't fire */
+    setTimeout(breakEndFinished, 20000);
+  } catch (_) { breakEndFinished(); }
+}
+
+function breakEndFinished() {
+  if (!breakEndPlaying) return; // already handled
+  breakEndPlaying = false;
+  stopKeepAlive();
 }
 
 /* ── Silent audio keep-alive ──
@@ -1814,14 +1827,17 @@ function startKeepAlive() {
 }
 let stopKeepAliveTimer = null;
 function stopKeepAlive() {
+  /* Don't stop while Pause.mp3 is still playing — breakEndFinished will call us again */
+  if (breakEndPlaying) return;
   if (!running && !screenTimeRunning && keepAliveAudio) {
     clearTimeout(stopKeepAliveTimer);
+    /* Small grace period, then stop the silent loop */
     stopKeepAliveTimer = setTimeout(() => {
-      if (!running && !screenTimeRunning && keepAliveAudio) {
+      if (!running && !screenTimeRunning && !breakEndPlaying && keepAliveAudio) {
         keepAliveAudio.pause();
         keepAliveAudio.currentTime = 0;
       }
-    }, 15000);
+    }, 2000);
   }
 }
 
@@ -2290,8 +2306,7 @@ function stTick() {
     screenTimeBanner.classList.remove('active');
     updateScreenTimeUI();
     clearBgTimer('screenTime');
-    playBreakEnd();
-    stopKeepAlive();
+    playBreakEnd();   // stopKeepAlive is called by onended after MP3 finishes
     vibrate([200, 100, 200]);
     notifyUser('Bildschirmzeit abgelaufen — Zeit für etwas anderes! 📵');
     showToast('Bildschirmzeit aufgebraucht!');
