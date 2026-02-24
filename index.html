@@ -1532,6 +1532,16 @@ let breakBankReserved = 0; // portion of breakBank NOT in the current pause sess
 let overtimeCredits   = 0; // how many 25-min work blocks have been credited this run
 let sliderContext   = null; // 'screenTime' | 'break' | 'earnedBreak'
 
+/* Guards against duplicate completion triggers (race between
+   visibilitychange and throttled setInterval on Android). */
+let pauseCompletionFired  = false;
+let stCompletionFired     = false;
+let lastBreakEndSoundTime = 0;   // epoch ms — debounce playBreakEnd()
+
+/* Scheduled background timer IDs (setTimeout backups for setInterval) */
+let pauseEndTimeoutId     = null;
+let stEndTimeoutId        = null;
+
 let secretCode   = localStorage.getItem('pomodoroSecretCode') || '';
 let codeRevealed = false;  // always starts hidden on fresh page load
 
@@ -1546,6 +1556,21 @@ function saveState() {
       coins, breakBank, screenTimeBank, doneInCycle,
     }));
   } catch(_) {}
+}
+
+/* Running-timer persistence: stores the epoch at which the current
+   pause / screen-time timer will reach zero.  Used by the SW and
+   by the visibilitychange handler to fire the completion even when
+   the page was frozen. */
+const TIMER_KEY = 'pomodoroRunningTimer';
+
+function saveRunningTimer(kind, endEpoch, msg) {
+  try {
+    localStorage.setItem(TIMER_KEY, JSON.stringify({ kind, endEpoch, msg }));
+  } catch(_) {}
+}
+function clearRunningTimer() {
+  try { localStorage.removeItem(TIMER_KEY); } catch(_) {}
 }
 
 function loadState() {
@@ -1764,32 +1789,116 @@ function showToast(msg) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   SOUND
+   SOUND  –  pre-rendered WAV via OfflineAudioContext
+   ---------------------------------------------------------------
+   We render the bell-chime ONCE into an <audio> element so that
+   .play() works even when the page is backgrounded on Android
+   (Web Audio API is muted in background; <audio> often is not).
+   The blob is generated on the first user interaction (unlock).
 ═══════════════════════════════════════════════════════════════ */
-function playDone() {
+let bellAudioEl  = null;   // <audio> element with the pre-rendered WAV
+let bellReady    = false;
+const BELL_DEBOUNCE_MS = 3000; // min gap between two playBreakEnd() calls
+
+/* Encode an AudioBuffer into a 16-bit PCM WAV blob */
+function audioBufferToWav(buf) {
+  const numCh = buf.numberOfChannels;
+  const sr    = buf.sampleRate;
+  const len   = buf.length;
+  const bps   = 16;
+  const block = numCh * bps / 8;
+  const dataSize = len * block;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view   = new DataView(buffer);
+  function ws(o, s) { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); }
+  ws(0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  ws(8, 'WAVE'); ws(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, numCh, true);
+  view.setUint32(24, sr, true);
+  view.setUint32(28, sr * block, true);
+  view.setUint16(32, block, true);
+  view.setUint16(34, bps, true);
+  ws(36, 'data');
+  view.setUint32(40, dataSize, true);
+  const ch0 = buf.getChannelData(0);
+  let offset = 44;
+  for (let i = 0; i < len; i++) {
+    const s = Math.max(-1, Math.min(1, ch0[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    offset += 2;
+  }
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
+/* Render the bell-chime offline and store as <audio> element */
+function prepareBellSound() {
+  if (bellReady || bellAudioEl) return;
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    [523, 659, 784, 1047].forEach((freq, i) => {
-      const osc  = ctx.createOscillator();
-      const gain = ctx.createGain();
+    const OffCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (!OffCtx) return;
+    const sr  = 44100;
+    const dur = 2.0; // seconds
+    const off = new OffCtx(1, sr * dur, sr);
+    [523, 659, 784].forEach((freq, i) => {
+      const osc  = off.createOscillator();
+      const gain = off.createGain();
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(off.destination);
       osc.type = 'sine';
       osc.frequency.value = freq;
-      const t0 = ctx.currentTime + i * 0.16;
+      const t0 = i * 0.32;
       gain.gain.setValueAtTime(0, t0);
-      gain.gain.linearRampToValueAtTime(0.22, t0 + 0.06);
-      gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.42);
+      gain.gain.linearRampToValueAtTime(0.32, t0 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t0 + 1.3);
       osc.start(t0);
-      osc.stop(t0 + 0.45);
+      osc.stop(t0 + 1.35);
     });
+    off.startRendering().then(rendered => {
+      const wav  = audioBufferToWav(rendered);
+      const url  = URL.createObjectURL(wav);
+      bellAudioEl = new Audio(url);
+      bellAudioEl.preload = 'auto';
+      bellReady = true;
+    }).catch(() => {});
   } catch(_) {}
 }
 
-/* Soft bell-chime played when a break (Pause or Bildschirmzeit) ends.
-   Three harmonic sine notes (C5→E5→G5) with a long resonant decay —
-   clearly audible, but gentle and not startling. */
+/* Unlock audio on first user gesture (required by mobile browsers) */
+function unlockAudio() {
+  prepareBellSound();
+  /* Also create + immediately pause a silent <audio> so the browser
+     considers audio "user-activated" for future .play() calls. */
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    ctx.resume().then(() => ctx.close()).catch(() => {});
+  } catch(_) {}
+}
+document.addEventListener('click',     unlockAudio, { once: true });
+document.addEventListener('touchstart', unlockAudio, { once: true });
+
+function playDone() {
+  playBreakEnd(); // reuse same bell sound
+}
+
+/* Play the bell-chime. Debounced: ignores calls within BELL_DEBOUNCE_MS
+   of the previous successful play — prevents the sound from firing
+   multiple times when setInterval + visibilitychange race on Android. */
 function playBreakEnd() {
+  const now = Date.now();
+  if (now - lastBreakEndSoundTime < BELL_DEBOUNCE_MS) return;
+  lastBreakEndSoundTime = now;
+
+  /* Primary: pre-rendered <audio> element (works in background on most
+     Android devices because it was triggered by a user gesture chain). */
+  if (bellReady && bellAudioEl) {
+    bellAudioEl.currentTime = 0;
+    bellAudioEl.play().catch(() => {});
+    return;
+  }
+  /* Fallback: live Web Audio API (foreground only) */
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     [523, 659, 784].forEach((freq, i) => {
@@ -1801,8 +1910,8 @@ function playBreakEnd() {
       osc.frequency.value = freq;
       const t0 = ctx.currentTime + i * 0.32;
       gain.gain.setValueAtTime(0, t0);
-      gain.gain.linearRampToValueAtTime(0.32, t0 + 0.02);   // fast attack → bell
-      gain.gain.exponentialRampToValueAtTime(0.001, t0 + 1.3); // long warm decay
+      gain.gain.linearRampToValueAtTime(0.32, t0 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t0 + 1.3);
       osc.start(t0);
       osc.stop(t0 + 1.35);
     });
@@ -1841,6 +1950,26 @@ function notifyUser(msg) {
   } else {
     new Notification('MyPomodoro', opts);
   }
+}
+
+/* ── Service-Worker scheduled timer ──
+   Posts the end-epoch to the SW so it can show a notification even if
+   the main page is completely frozen by Android's power saving. */
+function scheduleSWTimer(endEpoch, msg) {
+  try {
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({
+        type: 'SCHEDULE_TIMER', endEpoch, msg,
+      });
+    }
+  } catch(_) {}
+}
+function cancelSWTimer() {
+  try {
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({ type: 'CANCEL_TIMER' });
+    }
+  } catch(_) {}
 }
 
 function updateCoinDisplay() {
@@ -1918,6 +2047,16 @@ function switchMode(key, sessionSecs = null) {
    TIMER COMPLETE HANDLERS
 ═══════════════════════════════════════════════════════════════ */
 function onPauseComplete() {
+  /* Guard: prevent this from firing more than once per pause session.
+     On Android, a throttled setInterval tick can race with the
+     visibilitychange handler, both detecting timeLeft <= 0. */
+  if (pauseCompletionFired) return;
+  pauseCompletionFired = true;
+
+  /* Cancel the backup setTimeout so it doesn't fire again */
+  if (pauseEndTimeoutId) { clearTimeout(pauseEndTimeoutId); pauseEndTimeoutId = null; }
+  clearRunningTimer();
+
   /* Session timer ran out. The last tick already set
      breakBank = breakBankReserved + 0 = reserved unspent portion.
      Just clear the tracking variable — breakBank is already correct. */
@@ -1940,9 +2079,12 @@ function onPauseComplete() {
 ═══════════════════════════════════════════════════════════════ */
 function stopTimer() {
   if (timerId) { clearInterval(timerId); timerId = null; }
+  if (pauseEndTimeoutId)  { clearTimeout(pauseEndTimeoutId);  pauseEndTimeoutId  = null; }
   running = false;
   startEpoch = null;
   startLeft  = null;
+  clearRunningTimer();
+  cancelSWTimer();
   btnMain.classList.remove('running');
   icoPlay.style.display  = '';
   icoPause.style.display = 'none';
@@ -2010,6 +2152,7 @@ function tick() {
 
 function startTimer() {
   if (mode === 'pause' && (breakBank <= 0 || timeLeft <= 0)) return;
+  if (running) return;  // prevent duplicate intervals
 
   /* Never run two timers in parallel */
   if (screenTimeRunning) {
@@ -2022,6 +2165,9 @@ function startTimer() {
     Notification.requestPermission();
   }
 
+  /* Reset completion guard for this new session */
+  pauseCompletionFired = false;
+
   running = true;
   btnMain.classList.add('running');
   icoPlay.style.display  = 'none';
@@ -2032,7 +2178,29 @@ function startTimer() {
   startEpoch = Date.now();
   startLeft  = timeLeft;
 
+  /* Clear any leaked interval before creating a new one */
+  if (timerId) { clearInterval(timerId); timerId = null; }
   timerId = setInterval(tick, 1000);
+
+  /* Schedule a backup setTimeout for the exact timer duration.
+     On Android, setInterval is heavily throttled when the page is
+     backgrounded — this setTimeout fires even in many throttled
+     scenarios and triggers the completion handler. */
+  if (mode === 'pause') {
+    if (pauseEndTimeoutId) clearTimeout(pauseEndTimeoutId);
+    pauseEndTimeoutId = setTimeout(() => {
+      if (running && mode === 'pause') tick();
+    }, timeLeft * 1000 + 500); // +500ms safety margin
+
+    /* Persist the end-epoch so the SW and visibilitychange handler
+       can detect expiry even if the page was completely frozen. */
+    const endEpoch = startEpoch + timeLeft * 1000;
+    const msg = breakBank - timeLeft > 0
+      ? `Pause vorbei — noch ${fmt(breakBank - timeLeft)} Guthaben übrig`
+      : 'Pause aufgebraucht — bereit für den nächsten Fokus-Block?';
+    saveRunningTimer('pause', endEpoch, msg);
+    scheduleSWTimer(endEpoch, msg);
+  }
 }
 
 function toggleTimer() {
@@ -2145,6 +2313,13 @@ function stTick() {
   const remaining = Math.max(0, screenTimeInit - elapsed);
   stbTime.textContent = fmt(remaining);
   if (remaining <= 0) {
+    /* Guard: prevent duplicate completion (same race as pause timer) */
+    if (stCompletionFired) return;
+    stCompletionFired = true;
+
+    if (stEndTimeoutId) { clearTimeout(stEndTimeoutId); stEndTimeoutId = null; }
+    clearRunningTimer();
+
     clearInterval(screenTimeTimerId); screenTimeTimerId = null;
     screenTimeRunning = false; screenTimeEpoch = null;
     screenTimeBanner.classList.remove('active');
@@ -2158,6 +2333,7 @@ function stTick() {
 
 function startScreenTime(sessionSecs) {
   if (sessionSecs <= 0) return;
+  if (screenTimeRunning) return;  // prevent duplicate intervals
 
   /* Never run two timers in parallel */
   if (running) {
@@ -2170,17 +2346,35 @@ function startScreenTime(sessionSecs) {
     Notification.requestPermission();
   }
 
+  /* Reset completion guard */
+  stCompletionFired = false;
+
   screenTimeRunning = true;
   screenTimeEpoch   = Date.now();
   screenTimeInit    = sessionSecs;
   stbTime.textContent = fmt(sessionSecs);
   screenTimeBanner.classList.add('active');
+
+  if (screenTimeTimerId) { clearInterval(screenTimeTimerId); screenTimeTimerId = null; }
   screenTimeTimerId = setInterval(stTick, 1000);
   vibrate(80);
+
+  /* Backup setTimeout + SW scheduling (same pattern as pause timer) */
+  if (stEndTimeoutId) clearTimeout(stEndTimeoutId);
+  stEndTimeoutId = setTimeout(() => {
+    if (screenTimeRunning) stTick();
+  }, sessionSecs * 1000 + 500);
+
+  const endEpoch = screenTimeEpoch + sessionSecs * 1000;
+  saveRunningTimer('screenTime', endEpoch, 'Bildschirmzeit abgelaufen — Zeit für etwas anderes! 📵');
+  scheduleSWTimer(endEpoch, 'Bildschirmzeit abgelaufen — Zeit für etwas anderes! 📵');
 }
 
 function endScreenTimeEarly() {
   if (!screenTimeRunning) return;
+  if (stEndTimeoutId) { clearTimeout(stEndTimeoutId); stEndTimeoutId = null; }
+  clearRunningTimer();
+  cancelSWTimer();
   const elapsed = Math.floor((Date.now() - screenTimeEpoch) / 1000);
   const unused  = Math.max(0, screenTimeInit - elapsed);
   if (unused > 0) screenTimeBank += unused; // return unspent portion to bank
@@ -2337,6 +2531,29 @@ document.addEventListener('visibilitychange', () => {
   } else {
     if (running)            tick();
     if (screenTimeRunning)  stTick();
+
+    /* If neither timer is active but a persisted running-timer exists
+       whose end-epoch has passed, the page was completely frozen during
+       the timer's lifetime.  Handle the completion now. */
+    if (!running && !screenTimeRunning) {
+      try {
+        const raw = localStorage.getItem(TIMER_KEY);
+        if (raw) {
+          const rt = JSON.parse(raw);
+          if (rt.endEpoch && Date.now() >= rt.endEpoch) {
+            clearRunningTimer();
+            /* The timer expired while frozen — play sound + notification.
+               The SW may have already shown a notification, so just play
+               the audible bell and a toast. */
+            playBreakEnd();
+            vibrate([300, 100, 300]);
+            flashBody();
+            notifyUser(rt.msg || 'Timer abgelaufen');
+            showToast(rt.msg || 'Timer abgelaufen');
+          }
+        }
+      } catch(_) {}
+    }
   }
 });
 
@@ -2386,6 +2603,25 @@ refresh();
 updateCoinDisplay();
 updateScreenTimeUI();
 updateCodeCardUI();
+
+/* Check if a timer expired while the page was completely killed.
+   If so, play the completion sound and notification on next load. */
+try {
+  const rtRaw = localStorage.getItem(TIMER_KEY);
+  if (rtRaw) {
+    const rt = JSON.parse(rtRaw);
+    if (rt.endEpoch && Date.now() >= rt.endEpoch) {
+      clearRunningTimer();
+      /* Use a short delay so the UI is fully rendered first */
+      setTimeout(() => {
+        playBreakEnd();
+        vibrate([300, 100, 300]);
+        flashBody();
+        showToast(rt.msg || 'Timer abgelaufen');
+      }, 500);
+    }
+  }
+} catch(_) {}
 </script>
 </body>
 </html>

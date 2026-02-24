@@ -1,5 +1,35 @@
 /* ── Pomodoro Timer – Service Worker ── */
 
+/* ── Scheduled timer notification ──
+   The main page posts SCHEDULE_TIMER with { endEpoch, msg }.
+   We use setTimeout so the notification fires even when the page is
+   frozen by Android's power-saving.  The SW can still be terminated
+   by the browser at any time — so this is a best-effort enhancement
+   on top of the epoch-based checks in the main page. */
+let scheduledTimerId = null;
+
+self.addEventListener('message', e => {
+  if (!e.data) return;
+  if (e.data.type === 'SCHEDULE_TIMER') {
+    if (scheduledTimerId) { clearTimeout(scheduledTimerId); scheduledTimerId = null; }
+    const delay = Math.max(0, e.data.endEpoch - Date.now());
+    scheduledTimerId = setTimeout(() => {
+      scheduledTimerId = null;
+      self.registration.showNotification('MyPomodoro', {
+        body: e.data.msg || 'Timer abgelaufen',
+        icon:  'icons/icon-192.svg',
+        badge: 'icons/icon-192.svg',
+        tag:      'pomodoro-alert',
+        renotify: true,
+        requireInteraction: true,
+        vibrate: [200, 100, 200, 100, 300],
+      }).catch(() => {});
+    }, delay);
+  } else if (e.data.type === 'CANCEL_TIMER') {
+    if (scheduledTimerId) { clearTimeout(scheduledTimerId); scheduledTimerId = null; }
+  }
+});
+
 /* Notification click: Tap auf die Push-Notification öffnet / fokussiert die App */
 self.addEventListener('notificationclick', e => {
   e.notification.close();
@@ -12,7 +42,7 @@ self.addEventListener('notificationclick', e => {
       })
   );
 });
-const CACHE = 'pomodoro-v11';
+const CACHE = 'pomodoro-v12';
 
 /* Static assets that rarely change — safe to serve from cache */
 const STATIC_ASSETS = [
