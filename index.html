@@ -1796,22 +1796,15 @@ function showToast(msg) {
    Exception: tabs that are actively playing audio are NOT frozen.
 
    Strategy:  While a pause / screen-time timer runs, we loop a tiny
-   near-silent WAV.  This keeps the tab alive so setInterval fires
-   normally and Pause.mp3 can play at the exact moment the timer ends
-   — even with the screen off.
-
-   When the timer ends:
-     1. Play Pause.mp3  (tab stays alive because audio is playing)
-     2. Wait for Pause.mp3 to finish  (ended event)
-     3. THEN stop the keepalive loop
-
-   Additionally we use the Wake Lock API to prevent the device from
-   entering deep sleep, and the Media Session API to register as an
-   active media player.
+   near-silent WAV on a single <audio> element.  This keeps the tab
+   alive.  When the timer ends we switch THAT SAME element's source
+   from the silent WAV to Pause.mp3 and set volume to 1.  Because
+   the element is already "unlocked" (started from a user gesture),
+   the source-switch and play works reliably — even with the screen
+   off.  Using the same element avoids Android blocking a second
+   audio stream.
 ═══════════════════════════════════════════════════════════════ */
 const BELL_DEBOUNCE_MS = 3000; // min gap between two playBreakEnd() calls
-const pauseAudio = new Audio('Pause.mp3');
-pauseAudio.preload = 'auto';
 
 /* ── Wake Lock: prevents the device from sleeping ── */
 let wakeLock = null;
@@ -1836,8 +1829,10 @@ function releaseWakeLock() {
    Generates a tiny 1-second mono WAV (8 kHz, 16-bit) with amplitude 1
    (inaudible but not bitwise-silent, so Chrome won't discard it). */
 let keepAliveAudio = null;
+let silentWavUrl   = null;   // cached data-URI
 
-function createSilentWav() {
+function getSilentWav() {
+  if (silentWavUrl) return silentWavUrl;
   const sr = 8000, dur = 1, n = sr * dur, dataSize = n * 2;
   const buf = new ArrayBuffer(44 + dataSize);
   const v   = new DataView(buf);
@@ -1852,12 +1847,13 @@ function createSilentWav() {
   const bytes = new Uint8Array(buf);
   let bin = '';
   for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  return 'data:audio/wav;base64,' + btoa(bin);
+  silentWavUrl = 'data:audio/wav;base64,' + btoa(bin);
+  return silentWavUrl;
 }
 
 function startKeepAlive() {
   if (keepAliveAudio) return;          // already running
-  keepAliveAudio = new Audio(createSilentWav());
+  keepAliveAudio = new Audio(getSilentWav());
   keepAliveAudio.loop   = true;
   keepAliveAudio.volume = 0.01;        // near-silent
   keepAliveAudio.play().catch(() => {});
@@ -1870,7 +1866,6 @@ function startKeepAlive() {
       artist: 'MyPomodoro',
       album:  'Pomodoro Timer',
     });
-    /* Prevent "pause" from media controls from killing our keepalive */
     navigator.mediaSession.setActionHandler('pause', () => {});
     navigator.mediaSession.setActionHandler('play',  () => {});
   }
@@ -1892,43 +1887,30 @@ function stopKeepAlive() {
   releaseWakeLock();
 }
 
-/* Unlock audio on first user gesture (required by mobile browsers).
-   We do a tiny silent play so the browser allows future .play() calls
-   from non-gesture contexts (timers, visibilitychange, SW wake-ups). */
-function unlockAudio() {
-  pauseAudio.load();
-  /* Play + immediately pause to establish user-gesture audio permission */
-  const p = pauseAudio.play();
-  if (p && p.then) {
-    p.then(() => {
-      pauseAudio.pause();
-      pauseAudio.currentTime = 0;
-    }).catch(() => {});
-  }
-}
-document.addEventListener('click',     unlockAudio, { once: true });
-document.addEventListener('touchstart', unlockAudio, { once: true });
-
-/* Play Pause.mp3. Debounced to prevent the sound from firing
-   multiple times when setInterval + visibilitychange race on Android.
-   IMPORTANT: stopKeepAlive() is called AFTER Pause.mp3 finishes playing
-   (via the 'ended' event) — never before.  Stopping the keepalive loop
-   first would cause Chrome to freeze the tab and cut off the sound. */
+/* Play Pause.mp3.  Debounced against duplicate triggers.
+   CRITICAL: We reuse the SAME keepAliveAudio element that is already
+   playing (and thus already "unlocked" by the browser).  We switch
+   its source from the silent WAV to Pause.mp3 and raise the volume.
+   This avoids the Android limitation of only one active audio stream
+   and guarantees the play() call succeeds. */
 function playBreakEnd() {
   const now = Date.now();
   if (now - lastBreakEndSoundTime < BELL_DEBOUNCE_MS) return;
   lastBreakEndSoundTime = now;
 
-  pauseAudio.currentTime = 0;
-  pauseAudio.play().catch(() => {});
-
-  /* Stop the keepalive loop only AFTER Pause.mp3 has finished playing.
-     This ensures the tab stays "alive" (active audio) throughout.
-     Safety timeout in case 'ended' never fires. */
-  const cleanup = () => stopKeepAlive();
-  pauseAudio.removeEventListener('ended', cleanup);
-  pauseAudio.addEventListener('ended', cleanup, { once: true });
-  setTimeout(cleanup, 30000);  // safety: max 30s
+  if (keepAliveAudio) {
+    /* Switch the already-playing element to Pause.mp3 */
+    keepAliveAudio.loop   = false;
+    keepAliveAudio.volume = 1.0;
+    keepAliveAudio.src    = 'Pause.mp3';
+    keepAliveAudio.play().catch(() => {});
+    keepAliveAudio.addEventListener('ended', () => stopKeepAlive(), { once: true });
+    setTimeout(() => stopKeepAlive(), 30000);  // safety
+  } else {
+    /* No keepalive running (foreground / recovery case) — fresh element */
+    const a = new Audio('Pause.mp3');
+    a.play().catch(() => {});
+  }
 }
 
 function vibrate(pattern) {
