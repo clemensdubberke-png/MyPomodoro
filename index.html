@@ -569,6 +569,209 @@
     }
     .btn-rules:active { background: rgba(255,255,255,0.10); color: rgba(255,255,255,0.65); }
 
+    /* ── Stats button (mirrors .btn-rules on the left) ── */
+    .btn-stats {
+      position: absolute;
+      left: 0;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.03);
+      color: rgba(255,255,255,0.30);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.2s, color 0.2s;
+    }
+    .btn-stats:active { background: rgba(255,255,255,0.10); color: rgba(255,255,255,0.65); }
+
+    /* ── Stats panel ── */
+    .stats-body {
+      padding: 0 20px 24px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .stats-today-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+    .stats-today-card {
+      flex: 1;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 14px;
+      padding: 12px 8px 10px;
+      text-align: center;
+      border-top: 3px solid var(--stat-color);
+    }
+    .stats-today-card .stat-value {
+      font-family: 'Space Mono', monospace;
+      font-size: clamp(0.95rem, 3vw, 1.15rem);
+      font-weight: 700;
+      color: var(--stat-color);
+      margin-bottom: 2px;
+    }
+    .stats-today-card .stat-label {
+      font-size: 0.62rem;
+      font-weight: 300;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.40);
+    }
+    .stats-today-card .stat-icon {
+      font-size: 1rem;
+      margin-bottom: 4px;
+      display: block;
+    }
+
+    /* Period toggle (7/30 days) */
+    .stats-period-toggle {
+      display: flex;
+      gap: 3px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 100px;
+      padding: 3px;
+      margin-bottom: 16px;
+    }
+    .stats-period-btn {
+      flex: 1;
+      padding: 7px 10px;
+      border: none;
+      border-radius: 100px;
+      background: transparent;
+      color: rgba(255,255,255,0.45);
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 400;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .stats-period-btn.active {
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+      box-shadow: 0 2px 12px var(--glow);
+    }
+
+    /* Stacked bar chart */
+    .stats-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 140px;
+      margin-bottom: 12px;
+      padding: 0 2px;
+    }
+    .stats-bar-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      height: 100%;
+      justify-content: flex-end;
+      min-width: 0;
+    }
+    .stats-bar-stack {
+      width: 100%;
+      display: flex;
+      flex-direction: column-reverse;
+      border-radius: 3px 3px 0 0;
+      overflow: hidden;
+      min-height: 0;
+    }
+    .stats-bar-segment {
+      width: 100%;
+      min-height: 0;
+      transition: height 0.4s ease;
+    }
+    .stats-bar-segment.focus  { background: linear-gradient(to top, #ff6b35, #ffbe76); }
+    .stats-bar-segment.pause  { background: linear-gradient(to top, #00b894, #55efc4); }
+    .stats-bar-segment.screen { background: linear-gradient(to top, #7c3aed, #a78bfa); }
+    .stats-bar-empty {
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.12);
+      align-self: center;
+      margin-bottom: 2px;
+    }
+    .stats-bar-label {
+      font-size: 0.52rem;
+      color: rgba(255,255,255,0.30);
+      margin-top: 5px;
+      font-family: 'Space Mono', monospace;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+      text-align: center;
+    }
+    .stats-bar-label.today {
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    /* Legend */
+    .stats-legend {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+    .stats-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.65rem;
+      color: rgba(255,255,255,0.50);
+    }
+    .stats-legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    /* Averages */
+    .stats-averages {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 14px;
+      padding: 14px 16px;
+    }
+    .stats-avg-title {
+      font-size: 0.62rem;
+      font-weight: 300;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.35);
+      margin-bottom: 10px;
+    }
+    .stats-avg-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 0;
+    }
+    .stats-avg-row + .stats-avg-row {
+      border-top: 1px solid rgba(255,255,255,0.04);
+    }
+    .stats-avg-label {
+      font-size: 0.72rem;
+      color: rgba(255,255,255,0.55);
+    }
+    .stats-avg-value {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
     /* ── Rules panel content ── */
     .rules-section {
       padding: 14px 20px;
@@ -1323,8 +1526,91 @@
   </div>
 </div>
 
+<!-- Stats bottom sheet -->
+<div class="rewards-overlay" id="statsOverlay">
+  <div class="rewards-panel">
+    <div class="rewards-handle"></div>
+    <div class="rewards-header">
+      <div class="rewards-title">Statistik</div>
+      <button class="rewards-close" id="btnStatsClose">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <path d="M18 6L6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div class="stats-body">
+      <!-- Today cards -->
+      <div class="stats-today-row">
+        <div class="stats-today-card" style="--stat-color:#ff6b35">
+          <span class="stat-icon">🎯</span>
+          <div class="stat-value" id="statTodayFocus">0 Min</div>
+          <div class="stat-label">Fokus</div>
+        </div>
+        <div class="stats-today-card" style="--stat-color:#1dd1a1">
+          <span class="stat-icon">🌙</span>
+          <div class="stat-value" id="statTodayPause">0 Min</div>
+          <div class="stat-label">Pausen</div>
+        </div>
+        <div class="stats-today-card" style="--stat-color:#a78bfa">
+          <span class="stat-icon">📱</span>
+          <div class="stat-value" id="statTodayScreen">0 Min</div>
+          <div class="stat-label">Bildschirm</div>
+        </div>
+      </div>
+
+      <!-- Period toggle -->
+      <div class="stats-period-toggle">
+        <button class="stats-period-btn active" data-days="7">7 Tage</button>
+        <button class="stats-period-btn" data-days="30">30 Tage</button>
+      </div>
+
+      <!-- Chart -->
+      <div class="stats-chart" id="statsChart"></div>
+
+      <!-- Legend -->
+      <div class="stats-legend">
+        <div class="stats-legend-item">
+          <div class="stats-legend-dot" style="background:#ff6b35"></div> Fokus
+        </div>
+        <div class="stats-legend-item">
+          <div class="stats-legend-dot" style="background:#1dd1a1"></div> Pausen
+        </div>
+        <div class="stats-legend-item">
+          <div class="stats-legend-dot" style="background:#a78bfa"></div> Bildschirm
+        </div>
+      </div>
+
+      <!-- Averages -->
+      <div class="stats-averages">
+        <div class="stats-avg-title">Ø pro Tag</div>
+        <div class="stats-avg-row">
+          <div class="stats-avg-label">Fokus</div>
+          <div class="stats-avg-value" id="statAvgFocus" style="color:#ff6b35">—</div>
+        </div>
+        <div class="stats-avg-row">
+          <div class="stats-avg-label">Pausen</div>
+          <div class="stats-avg-value" id="statAvgPause" style="color:#1dd1a1">—</div>
+        </div>
+        <div class="stats-avg-row">
+          <div class="stats-avg-label">Bildschirm</div>
+          <div class="stats-avg-value" id="statAvgScreen" style="color:#a78bfa">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="app">
   <div class="header-row">
+    <button class="btn-stats" id="btnStats" title="Statistik">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+        <rect x="3" y="14" width="4" height="8" rx="1" fill="currentColor" stroke="none"/>
+        <rect x="10" y="8" width="4" height="14" rx="1" fill="currentColor" stroke="none"/>
+        <rect x="17" y="3" width="4" height="19" rx="1" fill="currentColor" stroke="none"/>
+      </svg>
+    </button>
     <div class="title">Pomodoro</div>
     <button class="btn-rules" id="btnRules" title="Spielregeln">
       <!-- Bulleted list icon -->
@@ -1585,6 +1871,153 @@ function loadState() {
     if (typeof s.screenTimeBank === 'number') screenTimeBank = s.screenTimeBank;
     if (typeof s.doneInCycle    === 'number') doneInCycle    = s.doneInCycle;
   } catch(_) {}
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   STATISTICS — daily tracking of focus, pause, screen-time
+═══════════════════════════════════════════════════════════════ */
+const STATS_KEY  = 'pomodoroStats';
+const STATS_DAYS = 31;  // keep at most 31 days
+let statsPeriod  = 7;   // current view: 7 or 30
+
+function todayKey() {
+  const d = new Date();
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+}
+
+function loadStats() {
+  try {
+    const raw = localStorage.getItem(STATS_KEY);
+    if (raw) { const s = JSON.parse(raw); if (s && s.days) return s; }
+  } catch(_) {}
+  return { days: {} };
+}
+
+function saveStats(stats) {
+  /* Prune entries older than STATS_DAYS */
+  const keys = Object.keys(stats.days).sort();
+  while (keys.length > STATS_DAYS) {
+    delete stats.days[keys.shift()];
+  }
+  try { localStorage.setItem(STATS_KEY, JSON.stringify(stats)); } catch(_) {}
+}
+
+function addStat(type, seconds) {
+  if (!seconds || seconds <= 0) return;
+  const stats = loadStats();
+  const key   = todayKey();
+  if (!stats.days[key]) stats.days[key] = { focus: 0, pause: 0, screen: 0 };
+  stats.days[key][type] = (stats.days[key][type] || 0) + Math.round(seconds);
+  saveStats(stats);
+}
+
+function fmtHM(secs) {
+  if (!secs || secs <= 0) return '0 Min';
+  const h = Math.floor(secs / 3600);
+  const m = Math.round((secs % 3600) / 60);
+  if (h > 0 && m > 0) return h + 'h ' + m + 'm';
+  if (h > 0)          return h + 'h';
+  return m + ' Min';
+}
+
+function dateLabel(dateStr, period) {
+  const d = new Date(dateStr + 'T12:00:00');
+  if (period <= 7) {
+    return ['So','Mo','Di','Mi','Do','Fr','Sa'][d.getDay()];
+  }
+  return String(d.getDate());
+}
+
+function renderStats() {
+  const stats = loadStats();
+  const tk    = todayKey();
+  const today = stats.days[tk] || { focus: 0, pause: 0, screen: 0 };
+
+  /* Today cards */
+  document.getElementById('statTodayFocus').textContent  = fmtHM(today.focus);
+  document.getElementById('statTodayPause').textContent  = fmtHM(today.pause);
+  document.getElementById('statTodayScreen').textContent = fmtHM(today.screen);
+
+  /* Build date list for the selected period */
+  const dates = [];
+  const now   = new Date();
+  for (let i = statsPeriod - 1; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const key = d.getFullYear() + '-' +
+      String(d.getMonth() + 1).padStart(2, '0') + '-' +
+      String(d.getDate()).padStart(2, '0');
+    dates.push(key);
+  }
+
+  /* Find max total for scaling */
+  let maxTotal = 0;
+  for (const key of dates) {
+    const day = stats.days[key];
+    if (day) {
+      const total = (day.focus || 0) + (day.pause || 0) + (day.screen || 0);
+      if (total > maxTotal) maxTotal = total;
+    }
+  }
+  if (maxTotal === 0) maxTotal = 1; // avoid division by zero
+
+  /* Render bars */
+  const chart = document.getElementById('statsChart');
+  chart.innerHTML = '';
+  for (const key of dates) {
+    const day   = stats.days[key] || { focus: 0, pause: 0, screen: 0 };
+    const total = (day.focus || 0) + (day.pause || 0) + (day.screen || 0);
+    const col   = document.createElement('div');
+    col.className = 'stats-bar-col';
+
+    if (total > 0) {
+      const stack = document.createElement('div');
+      stack.className = 'stats-bar-stack';
+      const chartH = 120; // usable px height
+
+      for (const [type, cls] of [['focus','focus'],['pause','pause'],['screen','screen']]) {
+        const val = day[type] || 0;
+        if (val > 0) {
+          const seg = document.createElement('div');
+          seg.className = 'stats-bar-segment ' + cls;
+          seg.style.height = Math.max(2, (val / maxTotal) * chartH) + 'px';
+          stack.appendChild(seg);
+        }
+      }
+      col.appendChild(stack);
+    } else {
+      const dot = document.createElement('div');
+      dot.className = 'stats-bar-empty';
+      col.appendChild(dot);
+    }
+
+    const label = document.createElement('div');
+    label.className = 'stats-bar-label';
+    if (key === tk) label.classList.add('today');
+    label.textContent = dateLabel(key, statsPeriod);
+    col.appendChild(label);
+    chart.appendChild(col);
+  }
+
+  /* Averages — only count days that have data */
+  let sumF = 0, sumP = 0, sumS = 0, daysWithData = 0;
+  for (const key of dates) {
+    const day = stats.days[key];
+    if (day && ((day.focus || 0) + (day.pause || 0) + (day.screen || 0)) > 0) {
+      sumF += day.focus  || 0;
+      sumP += day.pause  || 0;
+      sumS += day.screen || 0;
+      daysWithData++;
+    }
+  }
+  const avgF = daysWithData > 0 ? sumF / daysWithData : 0;
+  const avgP = daysWithData > 0 ? sumP / daysWithData : 0;
+  const avgS = daysWithData > 0 ? sumS / daysWithData : 0;
+  document.getElementById('statAvgFocus').textContent  = daysWithData > 0 ? fmtHM(avgF) : '—';
+  document.getElementById('statAvgPause').textContent  = daysWithData > 0 ? fmtHM(avgP) : '—';
+  document.getElementById('statAvgScreen').textContent = daysWithData > 0 ? fmtHM(avgS) : '—';
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -2116,6 +2549,7 @@ function onPauseComplete() {
      breakBank = breakBankReserved + 0 = reserved unspent portion.
      Just clear the tracking variable — breakBank is already correct. */
   breakBankReserved = 0;
+  addStat('pause', breakAtStart);
   saveState();
   playBreakEnd();
   vibrate([300, 100, 300]);
@@ -2133,6 +2567,18 @@ function onPauseComplete() {
    TIMER CONTROL
 ═══════════════════════════════════════════════════════════════ */
 function stopTimer() {
+  /* Track partial session time before clearing state */
+  if (running && startEpoch) {
+    const elapsed = Math.floor((Date.now() - startEpoch) / 1000);
+    if (mode === 'work') {
+      /* Only count time since the last credited 25-min block */
+      const partial = elapsed % CFG.work.sec;
+      if (partial > 0) addStat('focus', partial);
+    } else if (mode === 'pause') {
+      /* Pause stopped manually — count time consumed */
+      if (elapsed > 0) addStat('pause', Math.min(elapsed, startLeft));
+    }
+  }
   if (timerId) { clearInterval(timerId); timerId = null; }
   if (pauseEndTimeoutId)  { clearTimeout(pauseEndTimeoutId);  pauseEndTimeoutId  = null; }
   running = false;
@@ -2192,6 +2638,7 @@ function tick() {
       if (isLong) { coins++; updateCoinDisplay(); }
       if (doneInCycle >= 4) doneInCycle = 0;
       saveState();
+      addStat('focus', CFG.work.sec);
       const earnedLabel = isLong ? '15 Min' : '5 Min';
       const msg = isLong
         ? `Langer Zyklus! +${earnedLabel} — stoppe wenn du Pause machen willst`
@@ -2335,6 +2782,29 @@ rewardsOverlay.addEventListener('click', e => {
   if (e.target === rewardsOverlay) rewardsOverlay.classList.remove('open');
 });
 
+/* ── Stats modal ── */
+const statsOverlay   = document.getElementById('statsOverlay');
+const btnStats       = document.getElementById('btnStats');
+const btnStatsClose  = document.getElementById('btnStatsClose');
+btnStats.addEventListener('click', () => {
+  renderStats();
+  statsOverlay.classList.add('open');
+});
+btnStatsClose.addEventListener('click', () => statsOverlay.classList.remove('open'));
+statsOverlay.addEventListener('click', e => {
+  if (e.target === statsOverlay) statsOverlay.classList.remove('open');
+});
+
+/* Period toggle (7 / 30 days) */
+document.querySelectorAll('.stats-period-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.stats-period-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    statsPeriod = parseInt(btn.dataset.days, 10);
+    renderStats();
+  });
+});
+
 /* ── Reward: 30 min extra break ── */
 function buyExtraBreak30() {
   if (coins < 3) {
@@ -2382,6 +2852,7 @@ function stTick() {
     /* NOTE: stopKeepAlive() is NOT called here — playBreakEnd() handles it
        after Pause.mp3 finishes, to avoid cutting off the sound. */
 
+    addStat('screen', screenTimeInit);
     clearInterval(screenTimeTimerId); screenTimeTimerId = null;
     screenTimeRunning = false; screenTimeEpoch = null;
     screenTimeBanner.classList.remove('active');
@@ -2443,6 +2914,7 @@ function endScreenTimeEarly() {
   cancelSWTimer();
   stopKeepAlive();
   const elapsed = Math.floor((Date.now() - screenTimeEpoch) / 1000);
+  if (elapsed > 0) addStat('screen', Math.min(elapsed, screenTimeInit));
   const unused  = Math.max(0, screenTimeInit - elapsed);
   if (unused > 0) screenTimeBank += unused; // return unspent portion to bank
   clearInterval(screenTimeTimerId); screenTimeTimerId = null;
